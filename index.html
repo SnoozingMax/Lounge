@@ -324,6 +324,12 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
 .notif-state{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .notif-state .dotc{width:9px;height:9px;border-radius:50%;background:var(--off)}
 .notif-state .dotc.on{background:var(--ok)}
+.wait-void{position:fixed;inset:0;background:#000;color:#eeede9;display:grid;place-items:center;padding:24px;text-align:center}
+.wv-in h1{font-size:26px;font-weight:600;letter-spacing:-.03em}
+.wv-in p{color:#8b8982;margin-top:10px;font-size:15px}
+.wv-in .wv-name b{color:#eeede9}
+.wv-out{margin-top:36px;font-size:13px;color:#5d5b56;text-decoration:underline;text-underline-offset:3px}
+.wv-out:hover{color:#8b8982}
 .ch.locked{opacity:.45;cursor:default}
 .ch.locked:hover{background:none;color:var(--ink-2)}
 .ch .lk{color:var(--muted);display:grid}
@@ -369,38 +375,13 @@ code{font-family:'Geist Mono',monospace;font-size:.88em;background:var(--sunk);p
 <body>
 <div class="boot" id="boot"><div class="spin"></div></div>
 
-<div class="app no-members hidden" id="wait">
-  <aside class="side" id="waitSide">
-    <div class="side-head"><div class="brand"><span class="mark"></span><span class="brand-name" data-appname></span></div></div>
-    <div class="side-scroll">
-      <div class="sec"><div class="sec-h"><span>Channels</span></div>
-        <div class="ch active"><span class="hash">#</span><span class="lbl">waiting-room</span></div>
-        <div class="ch locked"><span class="hash">#</span><span class="lbl">general</span><span class="lk"></span></div>
-        <div class="ch locked"><span class="hash">#</span><span class="lbl">random</span><span class="lk"></span></div>
-      </div>
-      <div class="sec"><div class="sec-h"><span>Groups</span></div><div class="empty-sec">Locked until you’re in</div></div>
-      <div class="sec"><div class="sec-h"><span>Direct messages</span></div><div class="empty-sec">Locked until you’re in</div></div>
-    </div>
-    <div class="me" id="waitMe"></div>
-  </aside>
-  <main class="main">
-    <header class="top">
-      <button class="icon-btn only-mobile" id="waitMenu" title="Channels"></button>
-      <div class="top-title"><div class="t-name"><span class="hash">#</span><span>waiting-room</span></div><div class="t-topic">Hang tight. An admin will let you in.</div></div>
-    </header>
-    <div class="msgs"><div class="msgs-inner">
-      <div class="intro"><div class="big">#</div><h2>Welcome to #waiting-room</h2><p>Everyone new starts here. You can’t see the chat, send messages, or DM anyone until an admin lets you in.</p></div>
-      <div class="day">Today</div>
-      <div class="msg"><div class="gutter"><span class="av" style="--c:var(--accent);--s:38px">L</span></div><div class="body">
-        <div class="meta"><span class="name">Lounge</span><span class="tag">bot</span><time id="waitTime"></time></div>
-        <div class="text">Hey <b id="waitName"></b>, you made it! 👋<br>An admin has to approve you before you can chat. Message them outside of here and tell them your username: <b id="waitName2"></b></div>
-      </div></div>
-      <div class="msg compact"><div class="gutter"></div><div class="body"><div class="text">Leave this open. When you’re let in, a popup will tell you to refresh. 🔄</div></div></div>
-      <div class="msg compact"><div class="gutter"></div><div class="body"><div class="text" style="display:flex;align-items:center;gap:10px;color:var(--muted)"><span class="spin" style="width:14px;height:14px"></span>Checking for approval…</div></div></div>
-    </div></div>
-    <div class="composer-wrap"><div class="typing"></div><div class="banned-note">🔒 You can’t send messages until an admin lets you in.</div></div>
-  </main>
-  <div class="scrim" id="waitScrim"></div>
+<div class="wait-void hidden" id="wait">
+  <div class="wv-in">
+    <h1>You’re in the waiting room</h1>
+    <p>An admin needs to let you in. Keep this page open.</p>
+    <p class="wv-name">Your username: <b id="waitName"></b></p>
+    <button class="wv-out" id="waitOut" type="button">Log out</button>
+  </div>
 </div>
 <section class="auth hidden" id="auth">
   <div class="auth-card">
@@ -746,14 +727,7 @@ $('helpBtn').onclick = () => openGuide(false);
 let waitTimer = null, waitChan = null;
 function showWaiting(){
   show('wait');
-  const lock = sv('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>', 14);
-  document.querySelectorAll('#wait .lk').forEach(e => e.innerHTML = lock);
-  $('waitName').textContent = dn(S.me); $('waitName2').textContent = '@' + S.me.username;
-  $('waitTime').textContent = fmtStamp(S.me.created_at || new Date().toISOString());
-  $('waitMenu').innerHTML = I.menu;
-  $('waitMenu').onclick = () => $('wait').classList.toggle('side-open');
-  $('waitScrim').onclick = () => $('wait').classList.remove('side-open');
-  $('waitMe').innerHTML = `${avatarHTML(S.me, 34)}<div class="who"><div class="nm">${esc(dn(S.me))}</div><div class="st">Waiting for approval</div></div><button class="btn sm" id="waitOut" type="button">Log out</button>`;
+  $('waitName').textContent = '@' + S.me.username;
   $('waitOut').onclick = async () => { stopWaiting(); await sb.auth.signOut(); show('auth'); };
   let shown = false;
   const accepted = () => {
