@@ -292,6 +292,14 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
 .stat b{display:block;font-size:22px;font-family:'Geist Mono',monospace;font-weight:600;letter-spacing:-.02em}
 .stat span{font-size:12px;color:var(--muted)}
 .st-av{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.guide{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+.g-row{display:flex;gap:14px;padding:11px 4px;border-bottom:1px solid var(--line);align-items:flex-start}
+.g-row:last-child{border:0}
+.g-ic{flex:none;width:34px;height:34px;border-radius:10px;background:var(--sunk);display:grid;place-items:center;font-size:17px}
+.g-row .g-t{display:block;font-size:14.5px;font-weight:650;margin-bottom:2px}
+.g-row p b{color:var(--ink);font-weight:650}
+.g-row p{font-size:13.5px;color:var(--ink-2);line-height:1.45}
+.g-tabs{margin-bottom:6px}
 .key{font-family:'Geist Mono',monospace;font-size:22px;letter-spacing:.08em;background:var(--sunk);padding:14px;border-radius:12px;text-align:center;user-select:all;-webkit-user-select:all}
 .pw{position:relative}
 .pw .inp{padding-right:44px}
@@ -364,6 +372,7 @@ code{font-family:'Geist Mono',monospace;font-size:.88em;background:var(--sunk);p
     <header class="top">
       <button class="icon-btn only-mobile" id="menuBtn" title="Channels"></button>
       <div class="top-title"><div class="t-name" id="chName"></div><div class="t-topic" id="chTopic"></div></div>
+      <button class="icon-btn" id="helpBtn" title="How it works"></button>
       <button class="icon-btn" id="chSettingsBtn" title="Channel settings"></button>
       <button class="icon-btn" id="membersBtn" title="Members"></button>
     </header>
@@ -511,7 +520,7 @@ function fmtDay(t){
 }
 
 /* ---------- auth ---------- */
-let authMode = 'login';
+let authMode = 'login', justSignedUp = false;
 function setAuthMode(m){
   authMode = m;
   const up = m === 'signup';
@@ -577,6 +586,7 @@ $('authForm').onsubmit = async e => {
       const key = genKey();
       const { error: kerr } = await sb.rpc('set_recovery_key', { p_key: key });
       if (!kerr) await showRecoveryKey(key, true);
+      justSignedUp = true;
     } else {
       if (!existing) throw new Error('Invalid login');
       const { error } = await sb.auth.signInWithPassword({ email: existing, password: p });
@@ -610,6 +620,57 @@ if (LS.get('hideMembers', false)) $('app').classList.add('no-members');
   else show('auth');
 })();
 
+/* how-it-works guide */
+const GUIDE = {
+  basics: [
+    ['💬', 'Channels, groups, DMs', 'Channels on the left are for everyone. Groups are private chats you make with the <b>+</b> next to Groups. Tap anyone’s name, then <b>Message</b>, to DM them.'],
+    ['👆', 'Hold a message', 'Press and hold any message (right-click on a computer) to <b>react</b>, <b>reply</b>, <b>copy</b>, <b>edit</b>, or <b>delete</b>.'],
+    ['😭', 'Reactions', 'Hold a message and tap an emoji. Tap someone’s reaction under a message to add yours too.'],
+    ['🗑️', 'Deleting', 'You can delete your own message for <b>5 minutes</b> after sending it.'],
+    ['🖼️', 'Pictures', 'Tap the image button next to the text box, or paste one. They get shrunk automatically.']
+  ],
+  pings: [
+    ['📣', 'Ping someone', 'Type <code>@</code> and pick a name from the list, like <code>@max</code>. Their message gets highlighted and they hear a ping.'],
+    ['🤫', 'Silent ping', 'Start your message with <code>@silent</code>, like <code>@silent @max look</code>. It still highlights for them, just no sound.'],
+    ['🔔', 'Sound', 'Pings only make a sound after you’ve tapped somewhere in the chat once. Turn the sound off in Settings.'],
+    ['⌨️', 'Text tricks', '<code>**bold**</code>  <code>*italic*</code>  <code>~~strike~~</code>  <code>`code`</code>  and <code>&gt; quote</code>.']
+  ],
+  account: [
+    ['🙂', 'Your profile', 'Tap the gear at the bottom left. Add a photo, display name, status, bio, and color.'],
+    ['🔑', 'Recovery key', 'There’s no email on your account, so this code is how you reset a forgotten password. Get one in <b>Settings → Make a new one</b> and screenshot it.'],
+    ['🔒', 'Forgot your password?', 'Tap <b>Forgot password?</b> on the login page and use your recovery key. No key? Ask an admin to reset it.']
+  ],
+  admin: [
+    ['🛡️', 'Admin panel', 'Tap the shield at the bottom left or type <code>/admin</code>. Mute, ban, reset passwords, wipe someone’s messages, see stats.'],
+    ['⏱️', 'Commands', '<code>/mute @user 10</code> (minutes)  <code>/unmute @user</code>  <code>/ban @user</code>  <code>/unban @user</code>'],
+    ['📌', 'Channels', 'Only admins can make public channels. Use the <b>+</b> next to Channels.']
+  ]
+};
+function openGuide(first){
+  const tabs = [['basics', 'Basics'], ['pings', 'Pings'], ['account', 'Account']];
+  if (S.me && S.me.is_admin) tabs.push(['admin', 'Admin']);
+  const m = openModal(`<h3>${first ? `Welcome to ${esc(APP_NAME)}` : 'How it works'}</h3><p class="hint">${first ? 'Quick tour. You can open this again anytime with the <b>?</b> at the top.' : 'Everything you can do here.'}</p>
+    <div class="seg g-tabs" id="gTabs">${tabs.map(([k, l], i) => `<button type="button" data-t="${k}" class="${i ? '' : 'on'}">${l}</button>`).join('')}</div>
+    <div class="guide" id="gBody"></div>
+    <div class="row">${first ? `<button class="btn" id="gKey">Get my recovery key</button>` : ''}<button class="btn primary" data-close>${first ? 'Got it' : 'Done'}</button></div>`);
+  const draw = k => {
+    m.el.querySelectorAll('#gTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === k));
+    m.el.querySelector('#gBody').innerHTML = GUIDE[k].map(([ic, t, d]) => `<div class="g-row"><span class="g-ic">${ic}</span><div><span class="g-t">${t}</span><p>${d}</p></div></div>`).join('');
+  };
+  m.el.querySelector('#gTabs').onclick = e => { const b = e.target.closest('[data-t]'); if (b) draw(b.dataset.t); };
+  const k = m.el.querySelector('#gKey');
+  if (k) k.onclick = async () => {
+    const key = genKey();
+    const { error } = await sb.rpc('set_recovery_key', { p_key: key });
+    if (error) return toast(friendly(error));
+    m.close(); showRecoveryKey(key, true);
+  };
+  if (first) m.onclose = () => LS.set('guideSeen:' + S.me.id, true);
+  draw('basics');
+}
+$('helpBtn').innerHTML = sv('<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6"/><path d="M12 17h.01" stroke-width="2.6"/>', 19);
+$('helpBtn').onclick = () => openGuide(false);
+
 async function start(){
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { show('auth'); return; }
@@ -623,6 +684,8 @@ async function start(){
   subscribe();
   const last = LS.get('lastChannel', null);
   await openChannel(last && S.channels.has(last) ? last : defaultChannel());
+  if (!LS.get('guideSeen:' + S.me.id, false) && !justSignedUp) openGuide(true);
+  if (justSignedUp) { justSignedUp = false; openGuide(false); LS.set('guideSeen:' + S.me.id, true); }
 }
 
 function teardown(){
