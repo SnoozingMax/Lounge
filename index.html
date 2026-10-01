@@ -476,6 +476,7 @@ const I = {
   copy: sv('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h10"/>', 17),
   person: sv('<circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.5 3.6-5.5 7-5.5s6.2 2 7 5.5"/>', 17),
   shield: sv('<path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6l7-3z"/><path d="m9 12 2 2 4-4"/>', 18),
+  gearCog: sv('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>', 18),
   eye: sv('<path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>', 18),
   eyeOff: sv('<path d="M3 3l18 18M10.6 10.6a2.8 2.8 0 0 0 3.9 3.9M7.4 7.5C4.6 9.1 2.5 12 2.5 12s3.5 6.5 9.5 6.5c1.6 0 3-.4 4.3-1M9.9 5.8C10.6 5.6 11.3 5.5 12 5.5c6 0 9.5 6.5 9.5 6.5s-.9 1.7-2.6 3.3"/>', 18)
 };
@@ -663,8 +664,8 @@ const GUIDE = {
     ['⌨️', 'Text tricks', '<code>**bold**</code>  <code>*italic*</code>  <code>~~strike~~</code>  <code>`code`</code>  and <code>&gt; quote</code>.']
   ],
   account: [
-    ['🙂', 'Your profile', 'Tap the gear at the bottom left. Add a photo, display name, status, bio, and color.'],
-    ['🔑', 'Recovery key', 'There’s no email on your account, so this code is how you reset a forgotten password. Get one in <b>Settings → Make a new one</b> and screenshot it.'],
+    ['🙂', 'Your profile', 'Tap the <b>person</b> icon at the bottom left. Add a photo, display name, status, bio, and color. The <b>gear</b> next to it is Settings.'],
+    ['🔑', 'Recovery key', 'There’s no email on your account, so this code is how you reset a forgotten password. Get one in <b>Settings (gear) → Make a new one</b> and screenshot it.'],
     ['🔒', 'Forgot your password?', 'Tap <b>Forgot password?</b> on the login page and use your recovery key. No key? Ask an admin to reset it.']
   ],
   admin: [
@@ -1140,7 +1141,8 @@ function chLabel(c){ return c.kind === 'dm' ? (dn(dmOther(c)) || 'Unknown') : (c
 
 function renderMe(){
   if (!S.me) return;
-  $('meBar').innerHTML = `${avatarHTML(S.me, 34, true)}<div class="who" id="meWho"><div class="nm">${esc(dn(S.me))}</div><div class="st">${S.me.banned ? 'Banned' : isMuted() ? 'Muted' : S.me.status ? esc(S.me.status) : S.me.is_admin ? 'Admin' : 'Online'}</div></div>${S.me.is_admin ? `<button class="icon-btn" id="adminBtn" title="Admin panel">${I.shield}</button>` : ''}<button class="icon-btn" id="settingsBtn" title="Settings">${I.gear}</button>`;
+  $('meBar').innerHTML = `${avatarHTML(S.me, 34, true)}<div class="who" id="meWho"><div class="nm">${esc(dn(S.me))}</div><div class="st">${S.me.banned ? 'Banned' : isMuted() ? 'Muted' : S.me.status ? esc(S.me.status) : S.me.is_admin ? 'Admin' : 'Online'}</div></div>${S.me.is_admin ? `<button class="icon-btn" id="adminBtn" title="Admin panel">${I.shield}</button>` : ''}<button class="icon-btn" id="profileBtn" title="Edit profile">${I.person}</button><button class="icon-btn" id="settingsBtn" title="Settings">${I.gearCog}</button>`;
+  $('profileBtn').onclick = openEditProfile;
   $('settingsBtn').onclick = openSettings;
   if (S.me.is_admin) $('adminBtn').onclick = openAdmin;
   $('meWho').onclick = () => openProfile(S.me.id);
@@ -1907,7 +1909,7 @@ function openProfile(uid){
   m.el.onclick = e => {
     const b = e.target.closest('[data-a]'); if (!b) return;
     const a = b.dataset.a; m.close();
-    if (a === 'settings') openSettings();
+    if (a === 'settings') openEditProfile();
     else if (a === 'dm') openDm(uid);
     else if (a.startsWith('f-')) friendAction(uid, a.slice(2));
     else adminAction(S.profiles.get(uid) || u, a);
@@ -2082,24 +2084,59 @@ async function setAvatar(url){
   S.me = { ...S.me, avatar_url: url }; S.profiles.set(S.me.id, S.me);
   renderMe(); renderMembers(); renderMessages(false);
 }
-function openSettings(){
+function openEditProfile(){
   const me = S.me; let color = me.color;
-  const m = openModal(`<h3>Settings</h3><p class="hint">Your profile and preferences.</p>
-    <div class="st-av" id="stAv">${avatarHTML(me, 64)}<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" id="stAvBtn" type="button">${me.avatar_url ? 'Change photo' : 'Add photo'}</button>${me.avatar_url ? '<button class="btn sm" id="stAvX" type="button">Remove</button>' : ''}</div><input type="file" id="stAvIn" accept="image/*" hidden></div>
+  const m = openModal(`<h3>Edit profile</h3><p class="hint">How other people see you.</p>
+    <div class="st-av">${avatarHTML(me, 64)}<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" id="stAvBtn" type="button">${me.avatar_url ? 'Change photo' : 'Add photo'}</button>${me.avatar_url ? '<button class="btn sm" id="stAvX" type="button">Remove</button>' : ''}</div><input type="file" id="stAvIn" accept="image/*" hidden></div>
     <label class="field"><span>Display name</span><input class="inp" id="stDisp" value="${esc(me.display_name || '')}" maxlength="32" placeholder="${esc(me.username)}"></label>
     <label class="field"><span>Username <span style="font-weight:400;color:var(--muted)">(for @mentions and login)</span></span><input class="inp" id="stUser" value="${esc(me.username)}" maxlength="20" autocapitalize="off" spellcheck="false"></label>
     <label class="field"><span>Status</span><input class="inp" id="stStatus" value="${esc(me.status || '')}" maxlength="60" placeholder="What are you up to?"></label>
     <label class="field"><span>Bio</span><textarea class="inp" id="stBio" maxlength="190" rows="3" placeholder="Say something about yourself">${esc(me.bio)}</textarea></label>
     <div class="field"><span>Color</span><div class="swatches" id="stColor">${PALETTE.map(c => `<button type="button" class="sw ${c === color ? 'on' : ''}" data-c="${c}" style="--c:${c}"></button>`).join('')}</div></div>
-    <label class="field"><span>New password</span><span class="pw"><input class="inp" id="stPass" type="password" placeholder="Leave blank to keep it" autocomplete="new-password"><button class="eye" type="button" data-eye="stPass">${I.eye}</button></span></label>
+    <div class="err" id="stErr"></div>
+    <div class="row spread"><button class="btn" id="stView" type="button">View my profile</button><div class="grp"><button class="btn" data-close>Cancel</button><button class="btn primary" id="stSave">Save</button></div></div>`);
+  const q = x => m.el.querySelector(x), err = t => { q('#stErr').textContent = t; };
+  q('#stColor').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; color = b.dataset.c; q('#stColor').querySelectorAll('.sw').forEach(x => x.classList.toggle('on', x === b)); };
+  q('#stView').onclick = () => { m.close(); openProfile(S.me.id); };
+  q('#stAvBtn').onclick = () => q('#stAvIn').click();
+  q('#stAvIn').onchange = async () => {
+    const f = q('#stAvIn').files[0]; q('#stAvIn').value = ''; if (!f) return;
+    q('#stAvBtn').disabled = true; q('#stAvBtn').textContent = 'Uploading…';
+    try { await setAvatar(await uploadAvatar(f)); m.close(); openEditProfile(); toast('Photo updated'); }
+    catch (e) { err(friendly(e)); q('#stAvBtn').disabled = false; q('#stAvBtn').textContent = 'Add photo'; }
+  };
+  if (q('#stAvX')) q('#stAvX').onclick = async () => {
+    try { await sb.storage.from('avatars').remove([`${S.me.id}/avatar.jpg`]); await setAvatar(null); m.close(); openEditProfile(); } catch (e) { err(friendly(e)); }
+  };
+  q('#stSave').onclick = async () => {
+    const name = q('#stUser').value.trim(), bio = q('#stBio').value.trim();
+    const display_name = q('#stDisp').value.trim() || null, status = q('#stStatus').value.trim();
+    if (!/^[A-Za-z0-9_.]{3,20}$/.test(name)) return err('Usernames are 3 to 20 letters, numbers, _ or .');
+    q('#stSave').disabled = true;
+    try {
+      if (name !== me.username) { const { error } = await sb.rpc('change_username', { p_new: name }); if (error) throw error; }
+      if (bio !== me.bio || color !== me.color || display_name !== (me.display_name || null) || status !== (me.status || '')) {
+        const { error } = await sb.from('profiles').update({ bio, color, display_name, status }).eq('id', me.id); if (error) throw error;
+      }
+      S.me = { ...S.me, username: name, bio, color, display_name, status }; S.profiles.set(me.id, S.me); rebuildNames();
+      renderMe(); renderMembers(); renderMessages(false); renderHeader();
+      m.close(); toast('Profile saved');
+    } catch (e) { err(friendly(e)); q('#stSave').disabled = false; }
+  };
+}
+
+function openSettings(){
+  const m = openModal(`<h3>Settings</h3><p class="hint">Notifications, sound, and your account.</p>
     <div class="field"><span>Notifications</span><div class="notif-state"><span class="dotc" id="stNDot"></span><span id="stNText" style="flex:1;font-size:14px;color:var(--ink-2)">Checking…</span><button class="btn sm" type="button" id="stNBtn">Set up</button></div></div>
     <div class="field"><span>Ping sound</span><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div class="seg" id="stSound">${[['all', 'Every message'], ['pings', 'DMs + @mentions'], ['off', 'Off']].map(([v, l]) => `<button type="button" data-v="${v}" class="${soundMode() === v ? 'on' : ''}">${l}</button>`).join('')}</div><button class="btn sm" type="button" id="stTest">Test</button></div></div>
     <div class="divider"></div>
-    <div class="row spread" style="margin-top:0"><span class="hint" style="margin:0">Lost your recovery key?</span><button class="btn sm" id="stKey" type="button">Make a new one</button></div>
+    <label class="field"><span>Change password</span><span class="pw"><input class="inp" id="stPass" type="password" placeholder="New password" autocomplete="new-password"><button class="eye" type="button" data-eye="stPass">${I.eye}</button></span></label>
+    <div class="row" style="margin-top:-4px"><button class="btn sm" id="stPassGo" type="button">Update password</button></div>
+    <div class="row spread" style="margin-top:14px"><span class="hint" style="margin:0">Recovery key (for a forgotten password)</span><button class="btn sm" id="stKey" type="button">Make a new one</button></div>
+    <div class="row spread" style="margin-top:10px"><span class="hint" style="margin:0">How everything works</span><button class="btn sm" id="stGuide" type="button">Open guide</button></div>
     <div class="err" id="stErr" style="margin-top:12px"></div>
-    <div class="row spread"><button class="btn danger" id="stOut">Log out</button><div class="grp"><button class="btn" data-close>Cancel</button><button class="btn primary" id="stSave">Save</button></div></div>`);
+    <div class="row spread"><button class="btn danger" id="stOut">Log out</button><button class="btn primary" data-close>Done</button></div>`);
   const q = x => m.el.querySelector(x), err = t => { q('#stErr').textContent = t; };
-  q('#stColor').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; color = b.dataset.c; q('#stColor').querySelectorAll('.sw').forEach(x => x.classList.toggle('on', x === b)); };
   q('#stSound').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; LS.set('sound', b.dataset.v); syncPush(); q('#stSound').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
   q('#stTest').onclick = () => { unlockAudio(); ping(true); };
   pushState().then(st => {
@@ -2108,16 +2145,16 @@ function openSettings(){
     q('#stNBtn').textContent = st === 'on' ? 'Manage' : 'Set up';
   });
   q('#stNBtn').onclick = () => { m.close(); openNotifySetup(); };
+  q('#stGuide').onclick = () => { m.close(); openGuide(false); };
   q('#stOut').onclick = async () => { m.close(); try { await disablePush(); } catch {} await sb.auth.signOut(); };
-  q('#stAvBtn').onclick = () => q('#stAvIn').click();
-  q('#stAvIn').onchange = async () => {
-    const f = q('#stAvIn').files[0]; q('#stAvIn').value = ''; if (!f) return;
-    q('#stAvBtn').disabled = true; q('#stAvBtn').textContent = 'Uploading…';
-    try { await setAvatar(await uploadAvatar(f)); m.close(); openSettings(); toast('Photo updated'); }
-    catch (e) { err(friendly(e)); q('#stAvBtn').disabled = false; q('#stAvBtn').textContent = 'Add photo'; }
-  };
-  if (q('#stAvX')) q('#stAvX').onclick = async () => {
-    try { await sb.storage.from('avatars').remove([`${S.me.id}/avatar.jpg`]); await setAvatar(null); m.close(); openSettings(); } catch (e) { err(friendly(e)); }
+  q('#stPassGo').onclick = async () => {
+    const pass = q('#stPass').value;
+    if (pass.length < 6) return err('Password needs at least 6 characters.');
+    q('#stPassGo').disabled = true;
+    const { error } = await sb.auth.updateUser({ password: pass });
+    q('#stPassGo').disabled = false;
+    if (error) return err(friendly(error));
+    q('#stPass').value = ''; err(''); toast('Password updated');
   };
   q('#stKey').onclick = async () => {
     if (!await confirmBox('Make a new recovery key?', 'The old one stops working.', 'Make new key')) return;
@@ -2125,23 +2162,6 @@ function openSettings(){
     const { error } = await sb.rpc('set_recovery_key', { p_key: key });
     if (error) return toast(friendly(error));
     showRecoveryKey(key, false);
-  };
-  q('#stSave').onclick = async () => {
-    const name = q('#stUser').value.trim(), bio = q('#stBio').value.trim(), pass = q('#stPass').value;
-    const display_name = q('#stDisp').value.trim() || null, status = q('#stStatus').value.trim();
-    if (!/^[A-Za-z0-9_.]{3,20}$/.test(name)) return err('Usernames are 3 to 20 letters, numbers, _ or .');
-    if (pass && pass.length < 6) return err('Password needs at least 6 characters.');
-    q('#stSave').disabled = true;
-    try {
-      if (name !== me.username) { const { error } = await sb.rpc('change_username', { p_new: name }); if (error) throw error; }
-      if (bio !== me.bio || color !== me.color || display_name !== (me.display_name || null) || status !== (me.status || '')) {
-        const { error } = await sb.from('profiles').update({ bio, color, display_name, status }).eq('id', me.id); if (error) throw error;
-      }
-      if (pass) { const { error } = await sb.auth.updateUser({ password: pass }); if (error) throw error; }
-      S.me = { ...S.me, username: name, bio, color, display_name, status }; S.profiles.set(me.id, S.me); rebuildNames();
-      renderMe(); renderMembers(); renderMessages(false); renderHeader();
-      m.close(); toast('Saved');
-    } catch (e) { err(friendly(e)); q('#stSave').disabled = false; }
   };
 }
 </script>
