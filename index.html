@@ -322,6 +322,10 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
 .notif-state{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .notif-state .dotc{width:9px;height:9px;border-radius:50%;background:var(--off)}
 .notif-state .dotc.on{background:var(--ok)}
+.ch.locked{opacity:.45;cursor:default}
+.ch.locked:hover{background:none;color:var(--ink-2)}
+.ch .lk{color:var(--muted);display:grid}
+.ch:not(button){cursor:default}
 .key{font-family:'Geist Mono',monospace;font-size:22px;letter-spacing:.08em;background:var(--sunk);padding:14px;border-radius:12px;text-align:center;user-select:all;-webkit-user-select:all}
 .pw{position:relative}
 .pw .inp{padding-right:44px}
@@ -363,15 +367,39 @@ code{font-family:'Geist Mono',monospace;font-size:.88em;background:var(--sunk);p
 <body>
 <div class="boot" id="boot"><div class="spin"></div></div>
 
-<section class="auth hidden" id="wait">
-  <div class="auth-card">
-    <div class="brand"><span class="mark"></span><span class="brand-name" data-appname></span></div>
-    <h1>You’re in the waiting room</h1>
-    <p class="sub" id="waitSub">An admin needs to let you in. This page will open by itself as soon as they do, so you can leave it open.</p>
-    <div class="step" style="margin-bottom:20px"><span class="spin" style="width:18px;height:18px;flex:none;margin-top:2px"></span><p>Waiting for approval… Tell an admin your username: <b id="waitName"></b></p></div>
-    <button class="btn wide" id="waitOut" type="button">Log out</button>
-  </div>
-</section>
+<div class="app no-members hidden" id="wait">
+  <aside class="side" id="waitSide">
+    <div class="side-head"><div class="brand"><span class="mark"></span><span class="brand-name" data-appname></span></div></div>
+    <div class="side-scroll">
+      <div class="sec"><div class="sec-h"><span>Channels</span></div>
+        <div class="ch active"><span class="hash">#</span><span class="lbl">waiting-room</span></div>
+        <div class="ch locked"><span class="hash">#</span><span class="lbl">general</span><span class="lk"></span></div>
+        <div class="ch locked"><span class="hash">#</span><span class="lbl">random</span><span class="lk"></span></div>
+      </div>
+      <div class="sec"><div class="sec-h"><span>Groups</span></div><div class="empty-sec">Locked until you’re in</div></div>
+      <div class="sec"><div class="sec-h"><span>Direct messages</span></div><div class="empty-sec">Locked until you’re in</div></div>
+    </div>
+    <div class="me" id="waitMe"></div>
+  </aside>
+  <main class="main">
+    <header class="top">
+      <button class="icon-btn only-mobile" id="waitMenu" title="Channels"></button>
+      <div class="top-title"><div class="t-name"><span class="hash">#</span><span>waiting-room</span></div><div class="t-topic">Hang tight. An admin will let you in.</div></div>
+    </header>
+    <div class="msgs"><div class="msgs-inner">
+      <div class="intro"><div class="big">#</div><h2>Welcome to #waiting-room</h2><p>Everyone new starts here. You can’t see the chat, send messages, or DM anyone until an admin lets you in.</p></div>
+      <div class="day">Today</div>
+      <div class="msg"><div class="gutter"><span class="av" style="--c:var(--accent);--s:38px">L</span></div><div class="body">
+        <div class="meta"><span class="name">Lounge</span><span class="tag">bot</span><time id="waitTime"></time></div>
+        <div class="text">Hey <b id="waitName"></b>, you made it! 👋<br>An admin has to approve you before you can chat. Message them outside of here and tell them your username: <b id="waitName2"></b></div>
+      </div></div>
+      <div class="msg compact"><div class="gutter"></div><div class="body"><div class="text">Leave this open. When you’re let in, a popup will tell you to refresh. 🔄</div></div></div>
+      <div class="msg compact"><div class="gutter"></div><div class="body"><div class="text" style="display:flex;align-items:center;gap:10px;color:var(--muted)"><span class="spin" style="width:14px;height:14px"></span>Checking for approval…</div></div></div>
+    </div></div>
+    <div class="composer-wrap"><div class="typing"></div><div class="banned-note">🔒 You can’t send messages until an admin lets you in.</div></div>
+  </main>
+  <div class="scrim" id="waitScrim"></div>
+</div>
 <section class="auth hidden" id="auth">
   <div class="auth-card">
     <div class="brand"><span class="mark"></span><span class="brand-name" data-appname></span></div>
@@ -714,24 +742,42 @@ $('helpBtn').onclick = () => openGuide(false);
 let waitTimer = null, waitChan = null;
 function showWaiting(){
   show('wait');
-  $('waitName').textContent = S.me.username;
-  const done = async () => {
-    clearInterval(waitTimer); waitTimer = null;
-    if (waitChan) { sb.removeChannel(waitChan); waitChan = null; }
-    await start();
+  const lock = sv('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>', 14);
+  document.querySelectorAll('#wait .lk').forEach(e => e.innerHTML = lock);
+  $('waitName').textContent = dn(S.me); $('waitName2').textContent = '@' + S.me.username;
+  $('waitTime').textContent = fmtStamp(S.me.created_at || new Date().toISOString());
+  $('waitMenu').innerHTML = I.menu;
+  $('waitMenu').onclick = () => $('wait').classList.toggle('side-open');
+  $('waitScrim').onclick = () => $('wait').classList.remove('side-open');
+  $('waitMe').innerHTML = `${avatarHTML(S.me, 34)}<div class="who"><div class="nm">${esc(dn(S.me))}</div><div class="st">Waiting for approval</div></div><button class="btn sm" id="waitOut" type="button">Log out</button>`;
+  $('waitOut').onclick = async () => { stopWaiting(); await sb.auth.signOut(); show('auth'); };
+  let shown = false;
+  const accepted = () => {
+    if (shown) return; shown = true; stopWaiting();
+    try { ping(true); } catch {}
+    const m = openModal(`<div style="font-size:40px;margin-bottom:6px">🎉</div><h3>You’re in!</h3><p class="hint">An admin let you in. Refresh the page to start chatting.</p>
+      <div class="steps"><div class="step"><span class="n">!</span><p>If it still shows the waiting room after refreshing, close the tab and open the link again.</p></div></div>
+      <div class="row"><button class="btn primary wide" id="waitReload">Refresh now</button></div>`);
+    m.el.querySelector('#waitReload').onclick = () => { location.reload(); };
+    m.onclose = () => location.reload();
   };
   const check = async () => {
     const { data, error } = await sb.from('profiles').select('approved').eq('id', S.me.id).maybeSingle();
     if (error) return;
-    if (!data) { clearInterval(waitTimer); await sb.auth.signOut(); show('auth'); authErr('An admin didn’t let this account in.'); return; }
-    if (data.approved) done();
+    if (!data) { stopWaiting(); await sb.auth.signOut(); show('auth'); authErr('An admin didn’t let this account in.'); return; }
+    if (data.approved) accepted();
   };
-  clearInterval(waitTimer); waitTimer = setInterval(check, 15000);
-  if (waitChan) sb.removeChannel(waitChan);
-  waitChan = sb.channel('wait').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${S.me.id}` }, ({ new: n }) => { if (n.approved) done(); }).subscribe();
+  stopWaiting();
+  waitTimer = setInterval(check, 15000);
+  waitChan = sb.channel('wait').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${S.me.id}` }, ({ new: n }) => { if (n.approved) accepted(); }).subscribe();
+  waitCheck = check;
 }
-$('waitOut').onclick = async () => { clearInterval(waitTimer); if (waitChan) sb.removeChannel(waitChan); await sb.auth.signOut(); show('auth'); };
-document.addEventListener('visibilitychange', () => { if (!document.hidden && waitTimer) sb.from('profiles').select('approved').eq('id', S.me.id).maybeSingle().then(({ data }) => { if (data && data.approved) start(); }); });
+let waitCheck = null;
+function stopWaiting(){
+  clearInterval(waitTimer); waitTimer = null;
+  if (waitChan) { sb.removeChannel(waitChan); waitChan = null; }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && waitTimer && waitCheck) waitCheck(); });
 
 /* ---------- push notifications ---------- */
 const PUSH = (() => {
