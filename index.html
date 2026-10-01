@@ -637,7 +637,7 @@ const GUIDE = {
   pings: [
     ['📣', 'Ping someone', 'Type <code>@</code> and pick a name from the list, like <code>@max</code>. Their message gets highlighted and they hear a ping.'],
     ['🤫', 'Silent ping', 'Start your message with <code>@silent</code>, like <code>@silent @max look</code>. It still highlights for them, just no sound.'],
-    ['🔔', 'Sound', 'Pings only make a sound after you’ve tapped somewhere in the chat once. Turn the sound off in Settings.'],
+    ['🔔', 'Sound', 'Pick <b>Every message</b>, <b>DMs + @mentions</b>, or <b>Off</b> in Settings. Tap anywhere in the chat once so sound can play. On iPad, no sound if Silent Mode is on or Safari is in the background.'],
     ['⌨️', 'Text tricks', '<code>**bold**</code>  <code>*italic*</code>  <code>~~strike~~</code>  <code>`code`</code>  and <code>&gt; quote</code>.']
   ],
   account: [
@@ -831,16 +831,19 @@ function onMsg({ eventType, new: n, old: o }){
       if (n.user_id === S.me.id || S.nearBottom) scrollBottom(); else $('jumpBtn').classList.remove('hidden');
     }
     if (n.user_id !== S.me.id) {
-      if (here && !document.hidden && S.nearBottom) markRead(n.channel_id);
+      const c = S.channels.get(n.channel_id);
+      const mention = mentionsMe(n.content), silent = /^@silent\b/i.test(n.content || '');
+      const watching = here && !document.hidden && S.nearBottom;
+      if (watching) markRead(n.channel_id);
       else {
-        const c = S.channels.get(n.channel_id);
         const u = S.unread.get(n.channel_id) || { unread: 0, mentions: 0 };
         u.unread++;
-        const loud = mentionsMe(n.content) || (c && c.kind !== 'public');
-        if (mentionsMe(n.content)) u.mentions++;
+        if (mention) u.mentions++;
         S.unread.set(n.channel_id, u);
-        if (loud && !/^@silent\b/i.test(n.content || '')) ping();
       }
+      const mode = soundMode();
+      const wants = mode === 'all' || (mode === 'pings' && (mention || (c && c.kind !== 'public')));
+      if (wants && !silent) ping();
     }
     renderSidebar(); updateTitle();
   } else if (eventType === 'UPDATE') {
@@ -971,13 +974,25 @@ function updateTitle(){
   document.title = n ? `(${n}) ${APP_NAME}` : APP_NAME;
 }
 let actx;
-function unlockAudio(){ try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch {} }
-document.addEventListener('pointerdown', unlockAudio, { once: true });
-document.addEventListener('keydown', unlockAudio, { once: true });
-function ping(){
-  if (!LS.get('sound', true)) return;
+function soundMode(){ const v = LS.get('sound', true); return v === true ? 'pings' : v === false ? 'off' : v; }
+try { if (navigator.audioSession) navigator.audioSession.type = 'transient'; } catch {}
+function unlockAudio(){
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state !== 'running') actx.resume();
+    // iOS only unlocks audio after something plays during a tap
+    const b = actx.createBuffer(1, 1, 22050), src = actx.createBufferSource();
+    src.buffer = b; src.connect(actx.destination); src.start(0);
+  } catch {}
+}
+// keep re-unlocking: iOS suspends audio when the tab is backgrounded
+['pointerdown', 'touchend', 'keydown'].forEach(ev => document.addEventListener(ev, () => { if (!actx || actx.state !== 'running') unlockAudio(); }, { passive: true }));
+document.addEventListener('visibilitychange', () => { if (!document.hidden && actx && actx.state !== 'running') actx.resume().catch(() => {}); });
+function ping(force){
+  if (!force && soundMode() === 'off') return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state !== 'running') actx.resume();
     const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
     o.type = 'sine'; o.frequency.setValueAtTime(740, t); o.frequency.exponentialRampToValueAtTime(1180, t + .07);
     g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.11, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + .28);
@@ -1953,14 +1968,15 @@ function openSettings(){
     <label class="field"><span>Bio</span><textarea class="inp" id="stBio" maxlength="190" rows="3" placeholder="Say something about yourself">${esc(me.bio)}</textarea></label>
     <div class="field"><span>Color</span><div class="swatches" id="stColor">${PALETTE.map(c => `<button type="button" class="sw ${c === color ? 'on' : ''}" data-c="${c}" style="--c:${c}"></button>`).join('')}</div></div>
     <label class="field"><span>New password</span><span class="pw"><input class="inp" id="stPass" type="password" placeholder="Leave blank to keep it" autocomplete="new-password"><button class="eye" type="button" data-eye="stPass">${I.eye}</button></span></label>
-    <label class="toggle"><input type="checkbox" id="stSound" ${LS.get('sound', true) ? 'checked' : ''}><span>Ping sound for DMs and @mentions</span></label>
+    <div class="field"><span>Ping sound</span><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div class="seg" id="stSound">${[['all', 'Every message'], ['pings', 'DMs + @mentions'], ['off', 'Off']].map(([v, l]) => `<button type="button" data-v="${v}" class="${soundMode() === v ? 'on' : ''}">${l}</button>`).join('')}</div><button class="btn sm" type="button" id="stTest">Test</button></div></div>
     <div class="divider"></div>
     <div class="row spread" style="margin-top:0"><span class="hint" style="margin:0">Lost your recovery key?</span><button class="btn sm" id="stKey" type="button">Make a new one</button></div>
     <div class="err" id="stErr" style="margin-top:12px"></div>
     <div class="row spread"><button class="btn danger" id="stOut">Log out</button><div class="grp"><button class="btn" data-close>Cancel</button><button class="btn primary" id="stSave">Save</button></div></div>`);
   const q = x => m.el.querySelector(x), err = t => { q('#stErr').textContent = t; };
   q('#stColor').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; color = b.dataset.c; q('#stColor').querySelectorAll('.sw').forEach(x => x.classList.toggle('on', x === b)); };
-  q('#stSound').onchange = e => LS.set('sound', e.target.checked);
+  q('#stSound').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; LS.set('sound', b.dataset.v); q('#stSound').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
+  q('#stTest').onclick = () => { unlockAudio(); ping(true); };
   q('#stOut').onclick = async () => { m.close(); await sb.auth.signOut(); };
   q('#stAvBtn').onclick = () => q('#stAvIn').click();
   q('#stAvIn').onchange = async () => {
