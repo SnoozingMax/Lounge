@@ -374,7 +374,7 @@ code{font-family:'Geist Mono',monospace;font-size:.88em;background:var(--sunk);p
 </style>
 </head>
 <body>
-<div class="boot" id="boot"><div class="spin"></div></div>
+<div class="boot" id="boot"><div style="display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center"><div class="spin"></div><p id="bootMsg" style="color:var(--muted);font-size:14px;min-height:20px"></p><button class="link hidden" id="bootOut" type="button" style="font-size:13px;color:var(--muted)">Log out</button></div></div>
 
 <div class="wait-void hidden" id="wait">
   <div class="wv-in">
@@ -396,6 +396,7 @@ code{font-family:'Geist Mono',monospace;font-size:.88em;background:var(--sunk);p
       <button class="btn primary wide" id="authBtn" type="submit">Log in</button>
     </form>
     <p class="switch"><span id="authSwitchText">New here?</span> <button class="link" id="authSwitch" type="button">Create an account</button></p>
+    <div class="step hidden" id="saRow" style="margin-top:22px"><span class="n">!</span><p>Already logged in at <b>snoozingmax.github.io/Lounge</b>? <button class="link" id="saBtn" type="button">Tap here to stay signed in</button> so you don’t have to log in on Google Sites every time.</p></div>
     <p class="switch" id="forgotRow" style="margin-top:10px"><button class="link" id="forgotBtn" type="button">Forgot password?</button></p>
   </div>
 </section>
@@ -520,7 +521,7 @@ const S = {
 };
 
 let sb = null;
-try { if (!SUPABASE_URL.includes('PASTE')) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } catch (e) { sb = null; }
+try { if (!SUPABASE_URL.includes('PASTE')) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } }); } catch (e) { sb = null; }
 
 /* ---------- theme ---------- */
 function applyTheme(t){
@@ -581,6 +582,14 @@ function setAuthMode(m){
   $('authPass').autocomplete = up ? 'new-password' : 'current-password';
   $('authErr').textContent = '';
 }
+$('saBtn').onclick = async () => {
+  try {
+    await document.requestStorageAccess();
+    location.reload();
+  } catch {
+    toast('Open snoozingmax.github.io/Lounge once and log in there first');
+  }
+};
 $('authSwitch').onclick = () => setAuthMode(authMode === 'login' ? 'signup' : 'login');
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-eye]'); if (!b) return;
@@ -648,7 +657,7 @@ $('authForm').onsubmit = async e => {
 };
 
 function show(which){
-  $('boot').classList.add('hidden');
+  $('boot').classList.toggle('hidden', which !== 'boot');
   $('auth').classList.toggle('hidden', which !== 'auth');
   $('wait').classList.toggle('hidden', which !== 'wait');
   $('app').classList.toggle('hidden', which !== 'app');
@@ -665,10 +674,45 @@ if (LS.get('hideMembers', false)) $('app').classList.add('no-members');
 (async () => {
   if (!sb) { show('auth'); authErr('Setup needed: paste your Supabase URL and key at the top of this file.'); $('authBtn').disabled = true; return; }
   sb.auth.onAuthStateChange(ev => { if (ev === 'SIGNED_OUT') teardown(); });
-  const { data: { session } } = await sb.auth.getSession();
-  if (session) { try { await start(); } catch (e) { show('auth'); authErr(friendly(e)); } }
-  else show('auth');
+  let { data: { session } } = await sb.auth.getSession();
+  // inside Google Sites (Safari), try to use the login from the main site
+  if (!session && await borrowStorage()) ({ data: { session } } = await sb.auth.getSession());
+  if (session) await startWithRetry();
+  else showLogin();
 })();
+
+// still signed in but the network hiccuped: keep retrying instead of showing the login page
+async function startWithRetry(){
+  let tries = 0;
+  $('bootOut').onclick = async () => { await sb.auth.signOut(); show('auth'); };
+  for (;;) {
+    try { await start(); return; }
+    catch (e) {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { showLogin(); return; }
+      tries++;
+      show('boot');
+      $('bootMsg').textContent = navigator.onLine === false ? 'You\u2019re offline. Waiting for internet\u2026' : 'Couldn\u2019t connect. Trying again\u2026';
+      $('bootOut').classList.toggle('hidden', tries < 3);
+      await new Promise(r => setTimeout(r, Math.min(15000, 1500 * tries)));
+    }
+  }
+}
+window.addEventListener('online', () => { if (!$('boot').classList.contains('hidden')) $('bootMsg').textContent = 'Back online. Connecting\u2026'; });
+
+/* Safari blocks saved logins inside other sites (like Google Sites) unless you allow it */
+let inIframe = false; try { inIframe = window.top !== window.self; } catch { inIframe = true; }
+async function borrowStorage(){
+  if (!inIframe || !document.hasStorageAccess) return false;
+  try { if (await document.hasStorageAccess()) return false; } catch { return false; }
+  return false; // needs a tap first, handled by showLogin()
+}
+function showLogin(){
+  show('auth');
+  const row = $('saRow');
+  if (!inIframe || !document.requestStorageAccess) { row.classList.add('hidden'); return; }
+  document.hasStorageAccess().then(has => row.classList.toggle('hidden', has)).catch(() => row.classList.add('hidden'));
+}
 
 /* how-it-works guide */
 const GUIDE = {
