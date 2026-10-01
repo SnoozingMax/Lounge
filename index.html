@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Lounge</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Lounge">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
 <meta name="theme-color" content="#111113">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -303,6 +309,19 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
 .g-row p b{color:var(--ink);font-weight:650}
 .g-row p{font-size:13.5px;color:var(--ink-2);line-height:1.45}
 .g-tabs{margin-bottom:6px}
+.pushbar{flex:none;display:flex;align-items:center;gap:10px;padding:9px 12px 9px 16px;background:var(--accent-soft);border-bottom:1px solid var(--line);font-size:13.5px}
+.pushbar span{flex:1;min-width:0}
+.pushbar .x{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:var(--muted)}
+.pushbar .x:hover{background:var(--hover);color:var(--ink)}
+.steps{display:flex;flex-direction:column;gap:10px;margin:4px 0 6px}
+.step{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--line);border-radius:14px}
+.step .n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--bg);display:grid;place-items:center;font-weight:700;font-size:13px}
+.step b{font-weight:650}
+.step p{font-size:14px;line-height:1.5}
+.ios-ic{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:7px;background:var(--sunk);vertical-align:-8px;margin:0 2px;color:#3b82f6}
+.notif-state{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.notif-state .dotc{width:9px;height:9px;border-radius:50%;background:var(--off)}
+.notif-state .dotc.on{background:var(--ok)}
 .key{font-family:'Geist Mono',monospace;font-size:22px;letter-spacing:.08em;background:var(--sunk);padding:14px;border-radius:12px;text-align:center;user-select:all;-webkit-user-select:all}
 .pw{position:relative}
 .pw .inp{padding-right:44px}
@@ -379,6 +398,7 @@ code{font-family:'Geist Mono',monospace;font-size:.88em;background:var(--sunk);p
       <button class="icon-btn" id="chSettingsBtn" title="Channel settings"></button>
       <button class="icon-btn" id="membersBtn" title="Members"></button>
     </header>
+    <div class="pushbar hidden" id="pushBar"><span>🔔 Get pinged even when the chat is closed.</span><button class="btn sm primary" id="pushBarGo" type="button">Set up</button><button class="x" id="pushBarX" type="button" title="Hide"></button></div>
     <div class="msgs" id="msgs"><div class="msgs-inner" id="msgsInner"></div></div>
     <div class="composer-wrap">
       <button class="jump hidden" id="jumpBtn">New messages ↓</button>
@@ -423,6 +443,7 @@ const IMG_PREFIX = SUPABASE_URL.replace(/\/$/, '') + '/storage/v1/object/public/
 const AV_PREFIX = SUPABASE_URL.replace(/\/$/, '') + '/storage/v1/object/public/avatars/';
 const SHEET_EMOJI = ['👍','😂','❤️','🔥','💀','😭','👀','💯'];
 const DELETE_WINDOW = 5 * 60000;
+const VAPID_PUBLIC = 'BD6ZQnKpJte395o8SjKQyuOe4gYr8356df4mF0xXhBHv4Gfs8mkFfnM-HniZu02erQLNxng29U1JNQajxAYqAnw';
 
 /* ---------- tiny helpers ---------- */
 const $ = id => document.getElementById(id);
@@ -637,6 +658,7 @@ const GUIDE = {
   pings: [
     ['📣', 'Ping someone', 'Type <code>@</code> and pick a name from the list, like <code>@max</code>. Their message gets highlighted and they hear a ping.'],
     ['🤫', 'Silent ping', 'Start your message with <code>@silent</code>, like <code>@silent @max look</code>. It still highlights for them, just no sound.'],
+    ['📲', 'Notifications', 'Get pinged even when the chat is closed. Tap <b>Set up</b> on the orange bar, or Settings \u2192 Notifications. On iPad you add Lounge to your Home Screen first, and it shows you how.'],
     ['🔔', 'Sound', 'Pick <b>Every message</b>, <b>DMs + @mentions</b>, or <b>Off</b> in Settings. Tap anywhere in the chat once so sound can play. On iPad, no sound if Silent Mode is on or Safari is in the background.'],
     ['⌨️', 'Text tricks', '<code>**bold**</code>  <code>*italic*</code>  <code>~~strike~~</code>  <code>`code`</code>  and <code>&gt; quote</code>.']
   ],
@@ -676,6 +698,106 @@ function openGuide(first){
 $('helpBtn').innerHTML = sv('<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6"/><path d="M12 17h.01" stroke-width="2.6"/>', 19);
 $('helpBtn').onclick = () => openGuide(false);
 
+/* ---------- push notifications ---------- */
+const PUSH = (() => {
+  let inFrame = false; try { inFrame = window.top !== window.self; } catch { inFrame = true; }
+  const ua = navigator.userAgent;
+  const ios = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && (location.protocol === 'https:' || location.hostname === 'localhost');
+  return { inFrame, ios, standalone, supported, reg: null };
+})();
+const b64ToBytes = b => { const p = '='.repeat((4 - b.length % 4) % 4), r = atob((b + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(r, c => c.charCodeAt(0)); };
+async function swReady(){
+  if (!PUSH.supported || PUSH.inFrame) return null;
+  if (!PUSH.reg) { try { PUSH.reg = await navigator.serviceWorker.register('sw.js'); await navigator.serviceWorker.ready; } catch { return null; } }
+  return PUSH.reg;
+}
+async function pushState(){
+  if (PUSH.inFrame) return 'frame';
+  if (PUSH.ios && !PUSH.standalone) return 'install';
+  if (!PUSH.supported) return 'unsupported';
+  if (Notification.permission === 'denied') return 'blocked';
+  const reg = await swReady(); if (!reg) return 'unsupported';
+  const sub = await reg.pushManager.getSubscription();
+  return sub && Notification.permission === 'granted' ? 'on' : 'off';
+}
+async function saveSub(sub){
+  const j = sub.toJSON();
+  const { error } = await sb.rpc('save_push_sub', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_mode: soundMode() === 'all' ? 'all' : 'pings' });
+  if (error) throw error;
+}
+async function enablePush(){
+  const reg = await swReady(); if (!reg) throw new Error('Notifications aren’t supported here');
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') throw new Error(perm === 'denied' ? 'Notifications are blocked. Allow them in your browser settings.' : 'You need to tap Allow');
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(VAPID_PUBLIC) });
+  await saveSub(sub);
+}
+async function disablePush(){
+  const reg = await swReady(); if (!reg) return;
+  const sub = await reg.pushManager.getSubscription(); if (!sub) return;
+  await sb.from('push_subs').delete().eq('endpoint', sub.endpoint);
+  await sub.unsubscribe().catch(() => {});
+}
+async function syncPush(){
+  // re-link this device to whoever is logged in, keep mode in sync
+  try {
+    if ((await pushState()) !== 'on') return;
+    await saveSub(await PUSH.reg.pushManager.getSubscription());
+  } catch {}
+}
+async function refreshPushBar(){
+  const st = await pushState();
+  const hide = st === 'on' || st === 'unsupported' || LS.get('pushBarHidden', false);
+  $('pushBar').classList.toggle('hidden', hide);
+}
+const shareIc = '<span class="ios-ic">' + sv('<path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-8"/>', 16) + '</span>';
+const addIc = '<span class="ios-ic" style="color:var(--ink)">' + sv('<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/>', 16) + '</span>';
+async function openNotifySetup(){
+  const st = await pushState();
+  const link = location.href.split('?')[0].split('#')[0];
+  let html = '';
+  if (st === 'frame') html = `<h3>Open Lounge to turn on pings</h3><p class="hint">Google Sites won’t let notifications be turned on from inside the page. You only have to do this once.</p>
+    <div class="steps"><div class="step"><span class="n">1</span><p>Tap <b>Open Lounge</b> below. It opens in a new tab.</p></div>
+    <div class="step"><span class="n">2</span><p>Log in, then tap <b>Set up</b> on the orange bar, then <b>Allow</b>.</p></div>
+    <div class="step"><span class="n">3</span><p>Done. You’ll get pings even when you’re back on Google Sites or the tab is closed.</p></div></div>
+    <p class="hint" style="margin-top:8px">On an iPad? The new tab will walk you through adding it to your Home Screen.</p>
+    <div class="row"><button class="btn" data-close>Later</button><a class="btn primary" href="${esc(link)}" target="_blank" rel="noopener" style="display:inline-grid;place-items:center;text-decoration:none" data-close>Open Lounge</a></div>`;
+  else if (st === 'install') html = `<h3>Add Lounge to your Home Screen</h3><p class="hint">Apple only allows notifications for websites added to the Home Screen. Takes 20 seconds, once.</p>
+    <div class="steps"><div class="step"><span class="n">1</span><p>Tap the <b>Share</b> button ${shareIc} ${/iPad/.test(navigator.userAgent) || navigator.maxTouchPoints > 1 && !/iPhone/.test(navigator.userAgent) ? 'at the <b>top right</b> of Safari' : 'at the <b>bottom</b> of Safari'}.</p></div>
+    <div class="step"><span class="n">2</span><p>Scroll down and tap <b>Add to Home Screen</b> ${addIc}</p></div>
+    <div class="step"><span class="n">3</span><p>Tap <b>Add</b> in the top corner.</p></div>
+    <div class="step"><span class="n">4</span><p>Close Safari and open the new <b>Lounge</b> icon on your Home Screen. Log in, then tap <b>Set up</b> again and <b>Allow</b>.</p></div></div>
+    <p class="hint" style="margin-top:8px">Don’t see Add to Home Screen? Make sure you’re in <b>Safari</b>, and scroll the list down.</p>
+    <div class="row"><button class="btn primary" data-close>Got it</button></div>`;
+  else if (st === 'blocked') html = `<h3>Notifications are blocked</h3><p class="hint">You tapped Block at some point, so the browser won’t ask again. To fix it:</p>
+    <div class="steps">${PUSH.ios ? `<div class="step"><span class="n">1</span><p>Open the iPad <b>Settings</b> app → <b>Notifications</b> → <b>Lounge</b> → turn on <b>Allow Notifications</b>.</p></div>`
+      : `<div class="step"><span class="n">1</span><p>Tap the icon at the <b>left of the address bar</b> (it looks like sliders or a lock).</p></div><div class="step"><span class="n">2</span><p>Set <b>Notifications</b> to <b>Allow</b>, then reload the page.</p></div>`}</div>
+    <div class="row"><button class="btn primary" data-close>OK</button></div>`;
+  else if (st === 'unsupported') html = `<h3>Not supported here</h3><p class="hint">This browser can’t do notifications. Try Chrome on a computer or Chromebook, or Safari on iPad/iPhone (added to the Home Screen).</p><div class="row"><button class="btn primary" data-close>OK</button></div>`;
+  else html = `<h3>${st === 'on' ? 'Notifications are on' : 'Turn on notifications'}</h3><p class="hint">${st === 'on' ? 'This device gets pinged for DMs, groups, and @mentions, even with the chat closed.' : 'Get a popup for DMs, groups, and @mentions, even when the chat is closed. Tap the button, then tap <b>Allow</b>.'}</p>
+    <p class="hint">Want a ping for <b>every</b> message? Settings → Ping sound → Every message.</p>
+    <div class="err" id="ntErr"></div>
+    <div class="row">${st === 'on' ? '<button class="btn danger" id="ntOff">Turn off on this device</button><button class="btn primary" data-close>Done</button>' : '<button class="btn" data-close>Later</button><button class="btn primary" id="ntOn">Turn on</button>'}</div>`;
+  const m = openModal(html);
+  const on = m.el.querySelector('#ntOn'), off = m.el.querySelector('#ntOff');
+  if (on) on.onclick = async () => {
+    on.disabled = true; on.textContent = 'Turning on…';
+    try { await enablePush(); m.close(); toast('Notifications on'); refreshPushBar(); }
+    catch (e) { m.el.querySelector('#ntErr').textContent = friendly(e); on.disabled = false; on.textContent = 'Turn on'; }
+  };
+  if (off) off.onclick = async () => { await disablePush(); m.close(); toast('Notifications off for this device'); refreshPushBar(); };
+}
+$('pushBarGo').onclick = openNotifySetup;
+$('pushBarX').innerHTML = I.x;
+$('pushBarX').onclick = () => { LS.set('pushBarHidden', true); $('pushBar').classList.add('hidden'); toast('You can set it up later in Settings'); };
+if (PUSH.supported && !PUSH.inFrame) {
+  navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.type === 'open' && S.me) openChannel(e.data.channel); });
+  swReady();
+}
+
 async function start(){
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { show('auth'); return; }
@@ -687,8 +809,10 @@ async function start(){
   show('app');
   renderMe(); applyRestrictions();
   subscribe();
-  const last = LS.get('lastChannel', null);
-  await openChannel(last && S.channels.has(last) ? last : defaultChannel());
+  const last = LS.get('lastChannel', null), fromUrl = new URLSearchParams(location.search).get('c');
+  if (fromUrl) history.replaceState(null, '', location.pathname);
+  await openChannel(fromUrl && S.channels.has(fromUrl) ? fromUrl : last && S.channels.has(last) ? last : defaultChannel());
+  syncPush(); refreshPushBar();
   if (!LS.get('guideSeen:' + S.me.id, false) && !justSignedUp) openGuide(true);
   if (justSignedUp) { justSignedUp = false; openGuide(false); LS.set('guideSeen:' + S.me.id, true); }
 }
@@ -1968,6 +2092,7 @@ function openSettings(){
     <label class="field"><span>Bio</span><textarea class="inp" id="stBio" maxlength="190" rows="3" placeholder="Say something about yourself">${esc(me.bio)}</textarea></label>
     <div class="field"><span>Color</span><div class="swatches" id="stColor">${PALETTE.map(c => `<button type="button" class="sw ${c === color ? 'on' : ''}" data-c="${c}" style="--c:${c}"></button>`).join('')}</div></div>
     <label class="field"><span>New password</span><span class="pw"><input class="inp" id="stPass" type="password" placeholder="Leave blank to keep it" autocomplete="new-password"><button class="eye" type="button" data-eye="stPass">${I.eye}</button></span></label>
+    <div class="field"><span>Notifications</span><div class="notif-state"><span class="dotc" id="stNDot"></span><span id="stNText" style="flex:1;font-size:14px;color:var(--ink-2)">Checking…</span><button class="btn sm" type="button" id="stNBtn">Set up</button></div></div>
     <div class="field"><span>Ping sound</span><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div class="seg" id="stSound">${[['all', 'Every message'], ['pings', 'DMs + @mentions'], ['off', 'Off']].map(([v, l]) => `<button type="button" data-v="${v}" class="${soundMode() === v ? 'on' : ''}">${l}</button>`).join('')}</div><button class="btn sm" type="button" id="stTest">Test</button></div></div>
     <div class="divider"></div>
     <div class="row spread" style="margin-top:0"><span class="hint" style="margin:0">Lost your recovery key?</span><button class="btn sm" id="stKey" type="button">Make a new one</button></div>
@@ -1975,9 +2100,15 @@ function openSettings(){
     <div class="row spread"><button class="btn danger" id="stOut">Log out</button><div class="grp"><button class="btn" data-close>Cancel</button><button class="btn primary" id="stSave">Save</button></div></div>`);
   const q = x => m.el.querySelector(x), err = t => { q('#stErr').textContent = t; };
   q('#stColor').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; color = b.dataset.c; q('#stColor').querySelectorAll('.sw').forEach(x => x.classList.toggle('on', x === b)); };
-  q('#stSound').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; LS.set('sound', b.dataset.v); q('#stSound').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
+  q('#stSound').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; LS.set('sound', b.dataset.v); syncPush(); q('#stSound').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
   q('#stTest').onclick = () => { unlockAudio(); ping(true); };
-  q('#stOut').onclick = async () => { m.close(); await sb.auth.signOut(); };
+  pushState().then(st => {
+    const txt = { on: 'On for this device', off: 'Off', blocked: 'Blocked by the browser', install: 'Add to Home Screen first', frame: 'Open Lounge directly to turn on', unsupported: 'Not supported in this browser' }[st];
+    q('#stNText').textContent = txt; q('#stNDot').classList.toggle('on', st === 'on');
+    q('#stNBtn').textContent = st === 'on' ? 'Manage' : 'Set up';
+  });
+  q('#stNBtn').onclick = () => { m.close(); openNotifySetup(); };
+  q('#stOut').onclick = async () => { m.close(); try { await disablePush(); } catch {} await sb.auth.signOut(); };
   q('#stAvBtn').onclick = () => q('#stAvIn').click();
   q('#stAvIn').onchange = async () => {
     const f = q('#stAvIn').files[0]; q('#stAvIn').value = ''; if (!f) return;
