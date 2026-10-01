@@ -248,6 +248,7 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
 .picker{position:fixed;z-index:60;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:6px;display:grid;grid-template-columns:repeat(8,36px);gap:2px;animation:pop .14s ease}
 .picker button{width:36px;height:36px;border-radius:9px;font-size:20px;display:grid;place-items:center}
 .picker button:hover{background:var(--sunk)}
+.picker .pk-x{color:var(--muted)}
 .modal-bg{position:fixed;inset:0;z-index:50;background:rgba(15,15,12,.38);display:grid;place-items:center;padding:16px;animation:fade .15s ease}
 .modal{width:100%;max-width:420px;max-height:calc(100dvh - 32px);overflow-y:auto;background:var(--panel);border-radius:18px;box-shadow:var(--shadow);padding:22px;animation:pop .2s cubic-bezier(.2,.9,.3,1.15)}
 .modal h3{font-size:19px;font-weight:650;letter-spacing:-.025em;margin-bottom:4px}
@@ -1447,9 +1448,10 @@ $('msgsInner').addEventListener('click', e => {
     else if (a === 'edit') startEdit(m);
     else if (a === 'del') confirmDelete(m);
     else if (a === 'more') openSheet(id);
+    if (a !== 'react') deselectMsgs();
     return;
   }
-  const chip = t.closest('.rc'); if (chip && id) { toggleReact(id, chip.dataset.e); return; }
+  const chip = t.closest('.rc'); if (chip && id) { toggleReact(id, chip.dataset.e); deselectMsgs(); return; }
   const u = t.closest('[data-user]'); if (u && u.dataset.user) { openProfile(u.dataset.user); return; }
   if (t.matches('img.att')) { openLightbox(t.src); return; }
   const rr = t.closest('.reply-ref'); if (rr) { jumpTo(Number(rr.dataset.jump)); return; }
@@ -1525,18 +1527,28 @@ async function toggleReact(id, emoji){
   if (error && error.code !== '23505') { applyReact(id, S.me.id, emoji, mine); patchMsg(id); toast('Reaction failed'); }
 }
 
+function deselectMsgs(){ document.querySelectorAll('.msg.sel').forEach(x => x.classList.remove('sel')); }
+// tap anywhere that isn't the selected message (or the emoji picker) to hide its reaction bar
+document.addEventListener('pointerdown', e => {
+  if (e.target.closest('.msg.sel, .picker, .modal-bg')) return;
+  deselectMsgs();
+}, true);
+$('msgs').addEventListener('scroll', () => { if (S.picker) closePicker(); }, { passive: true });
 function openPicker(anchor, onPick){
   closePicker();
   const p = document.createElement('div');
   p.className = 'picker';
-  p.innerHTML = EMOJIS.map(e => `<button data-e="${e}">${e}</button>`).join('');
+  p.innerHTML = EMOJIS.map(e => `<button data-e="${e}">${e}</button>`).join('') + `<button class="pk-x" data-x title="Close">${I.x}</button>`;
   document.body.appendChild(p);
   const r = anchor.getBoundingClientRect(), w = p.offsetWidth, h = p.offsetHeight;
   const x = Math.min(innerWidth - w - 8, Math.max(8, r.right - w));
   let y = r.top - h - 6; if (y < 8) y = Math.min(innerHeight - h - 8, r.bottom + 6);
   p.style.left = x + 'px'; p.style.top = y + 'px';
-  p.onclick = e => { const b = e.target.closest('[data-e]'); if (b) { onPick(b.dataset.e); closePicker(); } };
-  const outside = e => { if (!p.contains(e.target)) closePicker(); };
+  p.onclick = e => {
+    if (e.target.closest('[data-x]')) { closePicker(); deselectMsgs(); return; }
+    const b = e.target.closest('[data-e]'); if (b) { onPick(b.dataset.e); closePicker(); deselectMsgs(); }
+  };
+  const outside = e => { if (!p.contains(e.target)) { closePicker(); if (!e.target.closest('.msg.sel')) deselectMsgs(); } };
   setTimeout(() => document.addEventListener('pointerdown', outside), 0);
   S.picker = { p, outside };
 }
