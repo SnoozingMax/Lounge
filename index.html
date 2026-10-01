@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Lounge</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#111113">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -112,6 +114,7 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
 
 /* avatars */
 .av{--s:32px;width:var(--s);height:var(--s);border-radius:calc(var(--s) * .32);background:var(--c);color:#fff;display:inline-grid;place-items:center;font-weight:650;font-size:calc(var(--s) * .44);flex:none;position:relative;cursor:pointer;user-select:none;line-height:1}
+.av img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
 .av .dot{position:absolute;right:-3px;bottom:-3px;width:11px;height:11px;border-radius:50%;background:var(--off);border:2.5px solid var(--bg)}
 .av .dot.on{background:var(--ok)}
 .main .av .dot,.modal .av .dot{border-color:var(--panel)}
@@ -163,6 +166,7 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
 .mn{background:var(--accent-soft);color:var(--accent-2);font-weight:600;border-radius:5px;padding:0 3px;cursor:pointer}
 [data-theme="dark"] .mn{color:#ff9a7a}
 .edited{font-size:11px;color:var(--muted)}
+.silent{font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:0 5px;margin-left:4px;vertical-align:1px}
 .att{display:block;max-width:min(380px,100%);max-height:340px;border-radius:12px;margin-top:6px;border:1px solid var(--line);cursor:zoom-in;background:var(--sunk)}
 .reply-ref{grid-column:2;font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center;margin-bottom:3px;cursor:pointer;min-width:0;white-space:nowrap;position:relative}
 .reply-ref::before{content:'';position:absolute;left:-38px;top:9px;width:30px;height:12px;border-left:2px solid var(--line);border-top:2px solid var(--line);border-top-left-radius:7px}
@@ -182,6 +186,7 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
 .tools button:hover{background:var(--hover);color:var(--ink)}
 .tools .del:hover{color:var(--danger)}
 @media (hover:none){
+  .msg{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
   .msg:hover{background:none}
   .msg.mention:hover{background:var(--mention)}
   .msg:hover .tools{display:none}
@@ -259,6 +264,40 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
 .divider{height:1px;background:var(--line);margin:18px 0}
 
 .modal.profile{padding:0;overflow:hidden;max-width:360px}
+.pc-status{margin-top:10px;font-size:14px;color:var(--ink-2)}
+.modal.sheet{padding:8px;max-width:380px}
+.sheet-head{display:flex;align-items:center;gap:10px;padding:8px 10px 10px}
+.sh-t{min-width:0;display:flex;flex-direction:column}
+.sh-t b{font-size:13.5px}
+.sh-t span{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheet-react{display:flex;gap:4px;padding:0 6px 8px;overflow-x:auto}
+.sheet-react button{flex:none;width:42px;height:42px;border-radius:50%;background:var(--sunk);font-size:21px;display:grid;place-items:center;color:var(--ink-2)}
+.sheet-react button.on{box-shadow:0 0 0 2px var(--accent) inset;background:var(--accent-soft)}
+.sheet-list{display:flex;flex-direction:column;border-top:1px solid var(--line);padding-top:6px}
+.sheet-list button{display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:10px;font-size:15px;font-weight:550;text-align:left;color:var(--ink-2)}
+.sheet-list button:hover{background:var(--hover);color:var(--ink)}
+.sheet-list button.danger{color:var(--danger)}
+.bg-sheet{align-items:end;padding:0}
+.bg-sheet .modal{border-radius:20px 20px 0 0;max-width:none;padding-bottom:max(10px,env(safe-area-inset-bottom))}
+@media (min-width:861px){.bg-sheet{align-items:center;padding:16px}.bg-sheet .modal{border-radius:18px;max-width:380px}}
+.modal.admin{max-width:540px}
+.btn.sm{height:28px;padding:0 10px;font-size:12px;border-radius:8px}
+.urow{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--line)}
+.urow:last-child{border:0}
+.urow .nm{flex:1;min-width:0;font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.urow .sub{display:block;font-size:12px;color:var(--muted);font-weight:400;white-space:normal}
+.urow .acts{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:52%}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{padding:12px;border:1px solid var(--line);border-radius:12px}
+.stat b{display:block;font-size:22px;font-family:'Geist Mono',monospace;font-weight:600;letter-spacing:-.02em}
+.stat span{font-size:12px;color:var(--muted)}
+.st-av{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.key{font-family:'Geist Mono',monospace;font-size:22px;letter-spacing:.08em;background:var(--sunk);padding:14px;border-radius:12px;text-align:center;user-select:all;-webkit-user-select:all}
+.pw{position:relative}
+.pw .inp{padding-right:44px}
+.eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:36px;height:34px;border-radius:8px;display:grid;place-items:center;color:var(--muted)}
+.eye:hover{color:var(--ink);background:var(--hover)}
+code{font-family:'Geist Mono',monospace;font-size:.88em;background:var(--sunk);padding:1px 5px;border-radius:5px}
 .pc-top{height:84px;background:var(--c)}
 .pc-body{padding:0 22px 22px;margin-top:-38px}
 .pc-body .av{border:4px solid var(--panel);box-sizing:content-box}
@@ -301,11 +340,12 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
     <p class="sub" id="authSub">Log in with your username.</p>
     <form id="authForm" novalidate>
       <label class="field"><span>Username</span><input class="inp" id="authUser" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="20"></label>
-      <label class="field"><span>Password</span><input class="inp" id="authPass" type="password" autocomplete="current-password"></label>
+      <label class="field"><span>Password</span><span class="pw"><input class="inp" id="authPass" type="password" autocomplete="current-password"><button class="eye" type="button" data-eye="authPass" title="Show password"></button></span></label>
       <div class="err" id="authErr"></div>
       <button class="btn primary wide" id="authBtn" type="submit">Log in</button>
     </form>
     <p class="switch"><span id="authSwitchText">New here?</span> <button class="link" id="authSwitch" type="button">Create an account</button></p>
+    <p class="switch" id="forgotRow" style="margin-top:10px"><button class="link" id="forgotBtn" type="button">Forgot password?</button></p>
   </div>
 </section>
 
@@ -365,9 +405,12 @@ const APP_NAME = 'Lounge';
 const EMAIL_DOMAIN = 'chat.local';
 const PAGE = 50;
 const EMOJIS = ['👍','😂','❤️','🔥','💀','😭','😮','🙏','🎉','👀','💯','😤','🥶','🤝','✅','❌','🫡','😎','🤔','🙄','👎','⭐','🍿','🚀'];
-const QUICK = ['👍','😂','🔥'];
+const QUICK = ['👍','😂','😭','🔥'];
 const PALETTE = ['#ff5b2e','#e5484d','#d6409f','#8e4ec6','#5b5bd6','#2f6bff','#0894b3','#12a594','#3e9b4f','#b3831a'];
 const IMG_PREFIX = SUPABASE_URL.replace(/\/$/, '') + '/storage/v1/object/public/attachments/';
+const AV_PREFIX = SUPABASE_URL.replace(/\/$/, '') + '/storage/v1/object/public/avatars/';
+const SHEET_EMOJI = ['👍','😂','❤️','🔥','💀','😭','👀','💯'];
+const DELETE_WINDOW = 5 * 60000;
 
 /* ---------- tiny helpers ---------- */
 const $ = id => document.getElementById(id);
@@ -396,8 +439,16 @@ const I = {
   gear: sv('<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>', 18),
   x: sv('<path d="M6 6l12 12M18 6 6 18"/>', 14),
   image: sv('<rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-9 9"/>', 19),
-  check: sv('<path d="m5 12 5 5 9-10"/>', 13)
+  check: sv('<path d="m5 12 5 5 9-10"/>', 13),
+  copy: sv('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h10"/>', 17),
+  person: sv('<circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.5 3.6-5.5 7-5.5s6.2 2 7 5.5"/>', 17),
+  shield: sv('<path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6l7-3z"/><path d="m9 12 2 2 4-4"/>', 18),
+  eye: sv('<path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>', 18),
+  eyeOff: sv('<path d="M3 3l18 18M10.6 10.6a2.8 2.8 0 0 0 3.9 3.9M7.4 7.5C4.6 9.1 2.5 12 2.5 12s3.5 6.5 9.5 6.5c1.6 0 3-.4 4.3-1M9.9 5.8C10.6 5.6 11.3 5.5 12 5.5c6 0 9.5 6.5 9.5 6.5s-.9 1.7-2.6 3.3"/>', 18)
 };
+const dn = u => (u && (u.display_name || u.username)) || '';
+const fmtMins = m => m < 60 ? `${m} min` : m < 1440 ? `${Math.round(m / 60)} h` : `${Math.round(m / 1440)} d`;
+const genKey = () => { const a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', b = crypto.getRandomValues(new Uint8Array(12)); let k = ''; for (let i = 0; i < 12; i++) k += a[b[i] % a.length] + (i === 3 || i === 7 ? '-' : ''); return k; };
 
 /* ---------- state ---------- */
 const S = {
@@ -436,6 +487,7 @@ function friendly(e){
   if (/rate limit|too many/i.test(m)) return 'Too many tries. Wait a minute and try again.';
   if (/Password should/i.test(m)) return 'Password needs at least 6 characters.';
   if (/signups.*disabled/i.test(m)) return 'Signups are turned off in Supabase.';
+  if (/Wrong username or recovery key/i.test(m)) return 'Wrong username or recovery key.';
   if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return 'Can\u2019t reach the server. Check your connection.';
   return m || 'Something went wrong.';
 }
@@ -472,6 +524,40 @@ function setAuthMode(m){
   $('authErr').textContent = '';
 }
 $('authSwitch').onclick = () => setAuthMode(authMode === 'login' ? 'signup' : 'login');
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-eye]'); if (!b) return;
+  const i = $(b.dataset.eye); const show = i.type === 'password';
+  i.type = show ? 'text' : 'password'; b.innerHTML = show ? I.eyeOff : I.eye; b.title = show ? 'Hide password' : 'Show password';
+});
+document.querySelectorAll('[data-eye]').forEach(b => b.innerHTML = I.eye);
+$('forgotBtn').onclick = () => {
+  const m = openModal(`<h3>Reset password</h3><p class="hint">Use the recovery key you got when you signed up. Lost it? Ask an admin to reset your password.</p>
+    <label class="field"><span>Username</span><input class="inp" id="rcUser" autocapitalize="off" spellcheck="false"></label>
+    <label class="field"><span>Recovery key</span><input class="inp mono" id="rcKey" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX"></label>
+    <label class="field"><span>New password</span><span class="pw"><input class="inp" id="rcPass" type="password" autocomplete="new-password"><button class="eye" type="button" data-eye="rcPass">${I.eye}</button></span></label>
+    <div class="err" id="rcErr"></div>
+    <div class="row"><button class="btn" data-close>Cancel</button><button class="btn primary" id="rcGo">Reset</button></div>`);
+  m.el.querySelector('#rcGo').onclick = async () => {
+    const q = x => m.el.querySelector(x), err = t => { q('#rcErr').textContent = t; };
+    const u = q('#rcUser').value.trim(), k = q('#rcKey').value.trim().toUpperCase(), pw = q('#rcPass').value;
+    if (!u || !k) return err('Fill in your username and key.');
+    if (pw.length < 6) return err('Password needs at least 6 characters.');
+    q('#rcGo').disabled = true;
+    const { error } = await sb.rpc('recover_password', { p_username: u, p_key: k, p_new: pw });
+    q('#rcGo').disabled = false;
+    if (error) return err(friendly(error));
+    m.close(); setAuthMode('login'); $('authUser').value = u; $('authPass').value = ''; toast('Password reset. Log in with the new one.');
+  };
+};
+function showRecoveryKey(key, first){
+  return new Promise(res => {
+    const m = openModal(`<h3>${first ? 'Save your recovery key' : 'New recovery key'}</h3><p class="hint">No email on this account, so this key is the only way to reset your password yourself. Screenshot it or copy it somewhere safe. It won\u2019t be shown again.</p>
+      <div class="key">${esc(key)}</div>
+      <div class="row spread"><button class="btn" id="rkCopy">Copy</button><button class="btn primary" data-close>I saved it</button></div>`);
+    m.el.querySelector('#rkCopy').onclick = async () => { try { await navigator.clipboard.writeText(key); toast('Copied'); } catch { toast('Select the key and copy it'); } };
+    m.onclose = res;
+  });
+}
 const authErr = m => { $('authErr').textContent = m; };
 
 $('authForm').onsubmit = async e => {
@@ -488,6 +574,9 @@ $('authForm').onsubmit = async e => {
       const { data, error } = await sb.auth.signUp({ email: `u_${rand}@${EMAIL_DOMAIN}`, password: p, options: { data: { username: u } } });
       if (error) throw error;
       if (!data.session) throw new Error('Account made, but "Confirm email" is still on in Supabase. Turn it off, then log in.');
+      const key = genKey();
+      const { error: kerr } = await sb.rpc('set_recovery_key', { p_key: key });
+      if (!kerr) await showRecoveryKey(key, true);
     } else {
       if (!existing) throw new Error('Invalid login');
       const { error } = await sb.auth.signInWithPassword({ email: existing, password: p });
@@ -530,7 +619,7 @@ async function start(){
   await loadChannels();
   await refreshState();
   show('app');
-  renderMe(); applyBan();
+  renderMe(); applyRestrictions();
   subscribe();
   const last = LS.get('lastChannel', null);
   await openChannel(last && S.channels.has(last) ? last : defaultChannel());
@@ -552,7 +641,7 @@ function defaultChannel(){
 
 /* ---------- data loading ---------- */
 async function loadProfiles(){
-  const { data, error } = await sb.from('profiles').select('id,username,color,bio,is_admin,banned,created_at');
+  const { data, error } = await sb.from('profiles').select('*');
   if (error) throw error;
   S.profiles.clear();
   for (const p of data) S.profiles.set(p.id, p);
@@ -648,7 +737,7 @@ async function catchUp(){
     if (S.current && S.channels.has(S.current)) { await loadMessages(S.current); renderMessages(S.nearBottom); }
     else await openChannel(defaultChannel());
     await refreshState();
-    renderMe(); renderHeader(); renderMembers(); applyBan();
+    renderMe(); renderHeader(); renderMembers(); applyRestrictions();
   } catch {}
 }
 
@@ -681,7 +770,7 @@ function onMsg({ eventType, new: n, old: o }){
         const loud = mentionsMe(n.content) || (c && c.kind !== 'public');
         if (mentionsMe(n.content)) u.mentions++;
         S.unread.set(n.channel_id, u);
-        if (loud) ping();
+        if (loud && !/^@silent\b/i.test(n.content || '')) ping();
       }
     }
     renderSidebar(); updateTitle();
@@ -767,7 +856,7 @@ function onProfile({ eventType, new: n }){
   if (eventType === 'DELETE' || !n) return;
   S.profiles.set(n.id, n); rebuildNames();
   if (S.me && n.id === S.me.id) {
-    const wasAdmin = S.me.is_admin; S.me = n; renderMe(); applyBan();
+    const wasAdmin = S.me.is_admin; S.me = n; renderMe(); applyRestrictions();
     if (wasAdmin !== n.is_admin) renderHeader();
   }
   renderSidebar(); renderMembers(); renderHeader();
@@ -792,7 +881,7 @@ function onTyping(p){
 function clearTyping(c, u){ const m = S.typing.get(c); if (m && m.has(u)) { clearTimeout(m.get(u)); m.delete(u); renderTyping(); } }
 function renderTyping(){
   const m = S.typing.get(S.current);
-  const names = m ? [...m.keys()].map(id => S.profiles.get(id)?.username).filter(Boolean) : [];
+  const names = m ? [...m.keys()].map(id => dn(S.profiles.get(id))).filter(Boolean) : [];
   if (!names.length) { $('typing').innerHTML = ''; return; }
   const who = names.length === 1 ? `<b>${esc(names[0])}</b> is typing`
     : names.length === 2 ? `<b>${esc(names[0])}</b> and <b>${esc(names[1])}</b> are typing`
@@ -813,6 +902,9 @@ function updateTitle(){
   document.title = n ? `(${n}) ${APP_NAME}` : APP_NAME;
 }
 let actx;
+function unlockAudio(){ try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch {} }
+document.addEventListener('pointerdown', unlockAudio, { once: true });
+document.addEventListener('keydown', unlockAudio, { once: true });
 function ping(){
   if (!LS.get('sound', true)) return;
   try {
@@ -826,29 +918,42 @@ function ping(){
 
 /* ---------- rendering: people ---------- */
 function avatarHTML(u, size = 32, dot = false){
-  const letter = esc(((u && u.username) || '?')[0].toUpperCase());
+  const letter = esc((dn(u) || '?')[0].toUpperCase());
+  const pic = u && u.avatar_url && u.avatar_url.startsWith(AV_PREFIX) ? `<img src="${esc(u.avatar_url)}" alt="" loading="lazy">` : letter;
   const d = dot && u ? `<i class="dot ${S.online.has(u.id) ? 'on' : ''}"></i>` : '';
-  return `<span class="av" data-user="${u ? u.id : ''}" style="--c:${safeColor(u && u.color)};--s:${size}px">${letter}${d}</span>`;
+  return `<span class="av" data-user="${u ? u.id : ''}" style="--c:${safeColor(u && u.color)};--s:${size}px">${pic}${d}</span>`;
 }
 function dmOther(c){
   const set = S.members.get(c.id);
   if (set) for (const id of set) if (id !== S.me.id) return S.profiles.get(id) || null;
   return S.me;
 }
-function chLabel(c){ return c.kind === 'dm' ? (dmOther(c)?.username || 'Unknown') : (c.name || 'Untitled'); }
+function chLabel(c){ return c.kind === 'dm' ? (dn(dmOther(c)) || 'Unknown') : (c.name || 'Untitled'); }
 
 function renderMe(){
   if (!S.me) return;
-  $('meBar').innerHTML = `${avatarHTML(S.me, 34, true)}<div class="who" id="meWho"><div class="nm">${esc(S.me.username)}</div><div class="st">${S.me.banned ? 'Banned' : S.me.is_admin ? 'Admin' : 'Online'}</div></div><button class="icon-btn" id="settingsBtn" title="Settings">${I.gear}</button>`;
+  $('meBar').innerHTML = `${avatarHTML(S.me, 34, true)}<div class="who" id="meWho"><div class="nm">${esc(dn(S.me))}</div><div class="st">${S.me.banned ? 'Banned' : isMuted() ? 'Muted' : S.me.status ? esc(S.me.status) : S.me.is_admin ? 'Admin' : 'Online'}</div></div>${S.me.is_admin ? `<button class="icon-btn" id="adminBtn" title="Admin panel">${I.shield}</button>` : ''}<button class="icon-btn" id="settingsBtn" title="Settings">${I.gear}</button>`;
   $('settingsBtn').onclick = openSettings;
+  if (S.me.is_admin) $('adminBtn').onclick = openAdmin;
   $('meWho').onclick = () => openProfile(S.me.id);
   $('newChannelBtn').classList.toggle('hidden', !S.me.is_admin);
 }
-function applyBan(){
-  const b = !!S.me?.banned;
-  $('composer').classList.toggle('hidden', b);
-  $('bannedNote').classList.toggle('hidden', !b);
+function isMuted(u = S.me){ return !!(u && u.muted_until && new Date(u.muted_until) > new Date()); }
+let restrictTimer;
+function applyRestrictions(){
+  clearTimeout(restrictTimer);
+  const b = !!S.me?.banned, mu = !b && isMuted();
+  $('composer').classList.toggle('hidden', b || mu);
+  $('bannedNote').classList.toggle('hidden', !(b || mu));
+  if (b) $('bannedNote').textContent = 'You\u2019ve been banned, so you can read but not send.';
+  else if (mu) {
+    const left = new Date(S.me.muted_until) - Date.now();
+    $('bannedNote').textContent = `You\u2019re muted for another ${fmtMins(Math.max(1, Math.ceil(left / 60000)))}.`;
+    restrictTimer = setTimeout(applyRestrictions, Math.min(60000, left + 500));
+  }
+  if (S.current && S.msgs.has(S.current)) renderMessages(false);
 }
+function canDelete(m){ return S.me.is_admin || (m.user_id === S.me.id && Date.now() - new Date(m.created_at) < DELETE_WINDOW); }
 
 function renderSidebar(){
   if (!S.me) return;
@@ -881,7 +986,7 @@ function renderHeader(){
   let name, topic = '';
   if (c.kind === 'public') { name = `<span class="hash">#</span><span>${esc(c.name)}</span>`; topic = esc(c.topic || ''); }
   else if (c.kind === 'group') { name = `<span class="gicon">${I.group}</span><span>${esc(c.name)}</span>`; topic = `${(S.members.get(c.id) || new Set()).size} members`; }
-  else { const o = dmOther(c); name = `${avatarHTML(o, 26, true)}<span>${esc(o?.username || 'Unknown')}</span>`; topic = o && S.online.has(o.id) ? 'Online' : 'Offline'; }
+  else { const o = dmOther(c); name = `${avatarHTML(o, 26, true)}<span>${esc(dn(o) || 'Unknown')}</span>`; topic = o && S.online.has(o.id) ? (o.status || 'Online') : 'Offline'; }
   $('chName').innerHTML = name; $('chTopic').innerHTML = topic;
   $('chSettingsBtn').classList.toggle('hidden', !(c.kind === 'group' || (c.kind === 'public' && S.me.is_admin)));
   $('input').placeholder = c.kind === 'public' ? `Message #${c.name}` : c.kind === 'group' ? `Message ${c.name}` : `Message @${dmOther(c)?.username || ''}`;
@@ -897,7 +1002,7 @@ function renderMembers(){
   const byName = (a, b) => S.profiles.get(a).username.localeCompare(S.profiles.get(b).username, undefined, { sensitivity: 'base' });
   const on = ids.filter(id => S.online.has(id)).sort(byName), off = ids.filter(id => !S.online.has(id)).sort(byName);
   const row = (id, isOn) => { const p = S.profiles.get(id);
-    return `<button class="mem ${isOn ? '' : 'off'}" data-user="${id}">${avatarHTML(p, 30, true)}<span class="nm">${esc(p.username)}</span>${p.is_admin ? '<span class="tag">admin</span>' : ''}${p.banned && S.me.is_admin ? '<span class="tag danger">ban</span>' : ''}</button>`; };
+    return `<button class="mem ${isOn ? '' : 'off'}" data-user="${id}">${avatarHTML(p, 30, true)}<span class="nm">${esc(dn(p))}</span>${p.is_admin ? '<span class="tag">admin</span>' : ''}${p.banned && S.me.is_admin ? '<span class="tag danger">ban</span>' : isMuted(p) && S.me.is_admin ? '<span class="tag">muted</span>' : ''}</button>`; };
   $('membersInner').innerHTML =
     `<div class="mem-h" style="margin-top:6px">Online · ${on.length}</div>${on.map(id => row(id, true)).join('')}` +
     (off.length ? `<div class="mem-h">Offline · ${off.length}</div>${off.map(id => row(id, false)).join('')}` : '');
@@ -959,18 +1064,20 @@ function msgEl(m, prev){
   let h = '';
   if (m.reply_to) {
     const r = S.byId.get(m.reply_to), ru = r && S.profiles.get(r.user_id);
-    h += `<div class="reply-ref" data-jump="${m.reply_to}">${r ? `<span class="rn">@${esc(ru?.username || 'unknown')}</span><span class="rt">${esc(snippet(r))}</span>` : '<span class="rt"><em>Original message was deleted</em></span>'}</div>`;
+    h += `<div class="reply-ref" data-jump="${m.reply_to}">${r ? `<span class="rn">${esc(dn(ru) || 'unknown')}</span><span class="rt">${esc(snippet(r))}</span>` : '<span class="rt"><em>Original message was deleted</em></span>'}</div>`;
   }
   h += compact ? `<div class="gutter"><time>${fmtTime(m.created_at)}</time></div>` : `<div class="gutter">${avatarHTML(u, 38)}</div>`;
   h += '<div class="body">';
-  if (!compact) h += `<div class="meta"><button class="name" data-user="${u.id}">${esc(u.username)}</button>${u.is_admin ? '<span class="tag">admin</span>' : ''}<time title="${esc(new Date(m.created_at).toLocaleString())}">${fmtStamp(m.created_at)}</time></div>`;
-  if (m.content) h += `<div class="text">${fmt(m.content)}${m.edited_at ? ' <span class="edited">(edited)</span>' : ''}</div>`;
+  if (!compact) h += `<div class="meta"><button class="name" data-user="${u.id}">${esc(dn(u))}</button>${u.is_admin ? '<span class="tag">admin</span>' : ''}<time title="${esc(new Date(m.created_at).toLocaleString())}">${fmtStamp(m.created_at)}</time></div>`;
+  const silent = /^@silent\b/i.test(m.content || '');
+  const body = silent ? m.content.replace(/^@silent\s*/i, '') : m.content;
+  if (m.content) h += `<div class="text">${fmt(body)}${silent ? '<span class="silent">silent</span>' : ''}${m.edited_at ? ' <span class="edited">(edited)</span>' : ''}</div>`;
   if (m.image_url && (m.image_url.startsWith(IMG_PREFIX) || m.image_url.startsWith('blob:'))) h += `<img class="att" src="${esc(m.image_url)}" alt="" loading="lazy">`;
   if (!m.pending) h += reactsHTML(m.id);
   h += '</div>';
-  if (!m.pending && !S.me.banned) {
+  if (!m.pending && !S.me.banned && !isMuted()) {
     const mine = m.user_id === S.me.id;
-    h += `<div class="tools">${QUICK.map(e => `<button data-act="q" data-e="${e}" title="React ${e}">${e}</button>`).join('')}<button data-act="react" title="Add reaction">${I.smile}</button><button data-act="reply" title="Reply">${I.reply}</button>${mine && m.content ? `<button data-act="edit" title="Edit">${I.edit}</button>` : ''}${mine || S.me.is_admin ? `<button data-act="del" class="del" title="Delete">${I.trash}</button>` : ''}</div>`;
+    h += `<div class="tools">${QUICK.map(e => `<button data-act="q" data-e="${e}" title="React ${e}">${e}</button>`).join('')}<button data-act="react" title="Add reaction">${I.smile}</button><button data-act="reply" title="Reply">${I.reply}</button>${mine && m.content ? `<button data-act="edit" title="Edit">${I.edit}</button>` : ''}${canDelete(m) ? `<button data-act="del" class="del" title="Delete">${I.trash}</button>` : ''}<button data-act="more" title="More">${I.dots}</button></div>`;
   }
   el.innerHTML = h;
   return el;
@@ -1044,6 +1151,7 @@ async function loadOlder(){
 
 /* message interactions */
 $('msgsInner').addEventListener('click', e => {
+  if (suppressClick) { suppressClick = false; e.preventDefault(); e.stopPropagation(); return; }
   const t = e.target;
   const row = t.closest('.msg');
   const id = row && !row.classList.contains('pending') ? Number(row.dataset.id) : null;
@@ -1055,6 +1163,7 @@ $('msgsInner').addEventListener('click', e => {
     else if (a === 'reply') startReply(m);
     else if (a === 'edit') startEdit(m);
     else if (a === 'del') confirmDelete(m);
+    else if (a === 'more') openSheet(id);
     return;
   }
   const chip = t.closest('.rc'); if (chip && id) { toggleReact(id, chip.dataset.e); return; }
@@ -1068,6 +1177,54 @@ $('msgsInner').addEventListener('click', e => {
     if (!was) row.classList.add('sel');
   }
 });
+/* hold a message (or right-click) for the action sheet */
+let lp = null, suppressClick = false;
+const cancelLp = () => { if (lp) { clearTimeout(lp.t); lp = null; } };
+$('msgsInner').addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' || (e.button && e.button !== 0)) return;
+  const row = e.target.closest('.msg'); if (!row || row.classList.contains('pending')) return;
+  if (e.target.closest('.tools,.rc,a')) return;
+  cancelLp();
+  lp = { x: e.clientX, y: e.clientY, t: setTimeout(() => {
+    lp = null; suppressClick = true; setTimeout(() => { suppressClick = false; }, 700);
+    try { navigator.vibrate && navigator.vibrate(10); } catch {}
+    openSheet(Number(row.dataset.id));
+  }, 420) };
+}, { passive: true });
+$('msgsInner').addEventListener('pointermove', e => { if (lp && Math.hypot(e.clientX - lp.x, e.clientY - lp.y) > 10) cancelLp(); }, { passive: true });
+$('msgsInner').addEventListener('pointerup', cancelLp); $('msgsInner').addEventListener('pointercancel', cancelLp);
+$('msgs').addEventListener('scroll', cancelLp, { passive: true });
+$('msgsInner').addEventListener('contextmenu', e => {
+  const row = e.target.closest('.msg'); if (!row || row.classList.contains('pending') || e.target.closest('a,img.att')) return;
+  e.preventDefault(); openSheet(Number(row.dataset.id));
+});
+function openSheet(id){
+  const m = S.byId.get(id); if (!m) return;
+  const u = S.profiles.get(m.user_id);
+  const mine = m.user_id === S.me.id, canAct = !S.me.banned && !isMuted();
+  document.querySelectorAll('.msg.sel').forEach(x => x.classList.remove('sel'));
+  const sh = openModal(`<div class="sheet-head">${avatarHTML(u, 30)}<div class="sh-t"><b>${esc(dn(u) || 'unknown')}</b><span>${esc(snippet(m))}</span></div></div>
+    ${canAct ? `<div class="sheet-react">${SHEET_EMOJI.map(e => `<button data-e="${e}" class="${S.reacts.get(id)?.get(e)?.has(S.me.id) ? 'on' : ''}">${e}</button>`).join('')}<button data-a="more" title="More reactions">${I.plusBig}</button></div>` : ''}
+    <div class="sheet-list">
+      ${canAct ? `<button data-a="reply">${I.reply}<span>Reply</span></button>` : ''}
+      ${m.content ? `<button data-a="copy">${I.copy}<span>Copy text</span></button>` : ''}
+      <button data-a="profile">${I.person}<span>${mine ? 'Your profile' : 'View profile'}</span></button>
+      ${mine && m.content && canAct ? `<button data-a="edit">${I.edit}<span>Edit</span></button>` : ''}
+      ${canDelete(m) ? `<button data-a="del" class="danger">${I.trash}<span>Delete${mine && !S.me.is_admin ? ' (under 5 min)' : ''}</span></button>` : ''}
+    </div>`, 'sheet');
+  sh.el.onclick = async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.e) { sh.close(); toggleReact(id, b.dataset.e); return; }
+    const a = b.dataset.a;
+    if (a === 'more') { openPicker(b, em => { sh.close(); toggleReact(id, em); }); return; }
+    sh.close();
+    if (a === 'reply') startReply(m);
+    else if (a === 'copy') { try { await navigator.clipboard.writeText(m.content); toast('Copied'); } catch { toast('Couldn\u2019t copy'); } }
+    else if (a === 'profile') openProfile(m.user_id);
+    else if (a === 'edit') startEdit(m);
+    else if (a === 'del') confirmDelete(m);
+  };
+}
 function jumpTo(id){
   const el = $('msgsInner').querySelector(`.msg[data-id="${id}"]`);
   if (!el) { toast('That message is further back'); return; }
@@ -1117,7 +1274,7 @@ function updateSend(){ $('sendBtn').disabled = !input.value.trim() && !S.file; }
 function startReply(m){
   S.editing = null; S.reply = m;
   const u = S.profiles.get(m.user_id);
-  $('compBarText').innerHTML = `Replying to <b>@${esc(u?.username || 'unknown')}</b>`;
+  $('compBarText').innerHTML = `Replying to <b>${esc(dn(u) || 'unknown')}</b>`;
   $('compBar').classList.remove('hidden');
   document.querySelectorAll('.msg.sel').forEach(x => x.classList.remove('sel'));
   input.focus();
@@ -1180,11 +1337,15 @@ input.addEventListener('keydown', e => {
 });
 $('sendBtn').onclick = () => { send(); input.focus(); };
 
+async function loadBitmap(f){
+  try { return await createImageBitmap(f); }
+  catch { return await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(f); }); }
+}
 async function prepImage(f){
   const ok = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
   if (f.type === 'image/gif' || (ok.includes(f.type) && f.size < 500000)) return f;
   try {
-    const bmp = await createImageBitmap(f);
+    const bmp = await loadBitmap(f);
     const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
     const c = document.createElement('canvas');
     c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
@@ -1223,6 +1384,10 @@ async function send(){
   }
 
   if (!text && !S.file) return;
+  if (text.startsWith('/') && !S.file) {
+    const handled = await runCommand(text);
+    if (handled) { input.value = ''; autosize(); updateSend(); return; }
+  }
   const ch = S.current, reply = S.reply, file = S.file;
   const tmp = { id: 't' + (++tmpN), pending: true, channel_id: ch, user_id: S.me.id, content: text, reply_to: reply ? reply.id : null, image_url: file ? URL.createObjectURL(file) : null, created_at: new Date().toISOString() };
   S.pending.push(tmp);
@@ -1249,6 +1414,35 @@ async function send(){
   renderSidebar();
 }
 
+/* slash commands */
+async function runCommand(text){
+  const [cmd, ...rest] = text.slice(1).trim().split(/\s+/);
+  const c = (cmd || '').toLowerCase();
+  if (c === 'admin') { openAdmin(); return true; }
+  if (c === 'help') { toast('/mute @user minutes · /unmute @user · /ban @user · /unban @user · /admin'); return true; }
+  if (c === 'silent') return false;
+  if (!['mute', 'unmute', 'ban', 'unban'].includes(c)) { toast(`Unknown command /${c}. Try /help`); return true; }
+  if (!S.me.is_admin) { toast('Admins only'); return true; }
+  const name = (rest[0] || '').replace(/^@/, '').toLowerCase();
+  const u = S.nameIdx.get(name);
+  if (!u) { toast(name ? `No user @${name}` : `Usage: /${c} @user${c === 'mute' ? ' minutes' : ''}`); return true; }
+  let r;
+  if (c === 'mute') {
+    const mins = parseInt(rest[1], 10);
+    if (!(mins > 0)) { toast('Usage: /mute @user minutes'); return true; }
+    r = await sb.rpc('admin_mute', { p_user: u.id, p_minutes: mins });
+    if (!r.error) toast(`Muted ${u.username} for ${fmtMins(mins)}`);
+  } else if (c === 'unmute') {
+    r = await sb.rpc('admin_mute', { p_user: u.id, p_minutes: 0 });
+    if (!r.error) toast(`Unmuted ${u.username}`);
+  } else {
+    r = await sb.rpc('admin_set', { p_user: u.id, p_field: 'banned', p_value: c === 'ban' });
+    if (!r.error) toast(`${c === 'ban' ? 'Banned' : 'Unbanned'} ${u.username}`);
+  }
+  if (r.error) toast(friendly(r.error));
+  return true;
+}
+
 /* mention autocomplete */
 let mst = { items: [], idx: 0, start: 0 };
 function updateMentions(){
@@ -1265,7 +1459,7 @@ function updateMentions(){
 }
 function drawMentions(){
   const el = $('mentionList');
-  el.innerHTML = mst.items.map((p, i) => `<button type="button" class="${i === mst.idx ? 'on' : ''}" data-i="${i}">${avatarHTML(p, 24, true).replace('data-user=', 'data-x=')}<span>${esc(p.username)}</span></button>`).join('');
+  el.innerHTML = mst.items.map((p, i) => `<button type="button" class="${i === mst.idx ? 'on' : ''}" data-i="${i}">${avatarHTML(p, 24, true).replace('data-user=', 'data-x=')}<span>${esc(dn(p))}${p.display_name ? ` <span style="color:var(--muted);font-weight:400">@${esc(p.username)}</span>` : ''}</span></button>`).join('');
   el.classList.remove('hidden');
 }
 function hideMentions(){ $('mentionList').classList.add('hidden'); }
@@ -1313,7 +1507,7 @@ $('membersBtn').onclick = () => {
 const modals = [];
 function openModal(html, cls = ''){
   const bg = document.createElement('div');
-  bg.className = 'modal-bg';
+  bg.className = 'modal-bg' + (cls ? ' bg-' + cls : '');
   bg.innerHTML = `<div class="modal ${cls}">${html}</div>`;
   document.body.appendChild(bg);
   const m = { el: bg.firstElementChild, bg, close(){ bg.remove(); const i = modals.indexOf(m); if (i >= 0) modals.splice(i, 1); if (m.onclose) m.onclose(); } };
@@ -1349,7 +1543,7 @@ function peoplePicker(host, { multi, exclude = new Set(), onPick }){
     const s = q.value.trim().toLowerCase();
     const people = [...S.profiles.values()].filter(p => p.id !== S.me.id && !exclude.has(p.id) && p.username.toLowerCase().includes(s))
       .sort((a, b) => (S.online.has(b.id) - S.online.has(a.id)) || a.username.localeCompare(b.username));
-    list.innerHTML = people.map(p => `<button type="button" class="pick ${chosen.has(p.id) ? 'on' : ''}" data-id="${p.id}">${avatarHTML(p, 28, true).replace('data-user=', 'data-x=')}<span class="nm">${esc(p.username)}</span>${multi ? `<span class="chk">${I.check}</span>` : ''}</button>`).join('') || '<div class="pick-empty">No one found</div>';
+    list.innerHTML = people.map(p => `<button type="button" class="pick ${chosen.has(p.id) ? 'on' : ''}" data-id="${p.id}">${avatarHTML(p, 28, true).replace('data-user=', 'data-x=')}<span class="nm">${esc(dn(p))}</span>${multi ? `<span class="chk">${I.check}</span>` : ''}</button>`).join('') || '<div class="pick-empty">No one found</div>';
   };
   q.oninput = draw;
   list.onclick = e => {
@@ -1452,59 +1646,183 @@ $('chSettingsBtn').onclick = () => {
 };
 
 /* profile card */
+function muteBox(u){
+  const m = openModal(`<h3>Mute ${esc(dn(u))}</h3><p class="hint">They can read but not send until it runs out.</p>
+    <div class="seg" id="mtPre">${[['5','5 min'],['30','30 min'],['60','1 hour'],['1440','1 day']].map(([v, l]) => `<button type="button" data-v="${v}">${l}</button>`).join('')}</div>
+    <label class="field" style="margin-top:12px"><span>Or minutes</span><input class="inp" id="mtMin" type="number" min="1" value="10"></label>
+    <div class="row"><button class="btn" data-close>Cancel</button><button class="btn primary" id="mtGo">Mute</button></div>`);
+  const go = async mins => {
+    if (!(mins > 0)) return;
+    const { error } = await sb.rpc('admin_mute', { p_user: u.id, p_minutes: mins });
+    if (error) return toast(friendly(error));
+    S.profiles.set(u.id, { ...u, muted_until: new Date(Date.now() + mins * 60000).toISOString() });
+    m.close(); toast(`Muted ${u.username} for ${fmtMins(mins)}`); renderMembers();
+  };
+  m.el.querySelector('#mtPre').onclick = e => { const b = e.target.closest('[data-v]'); if (b) go(+b.dataset.v); };
+  m.el.querySelector('#mtGo').onclick = () => go(parseInt(m.el.querySelector('#mtMin').value, 10));
+}
+async function adminAction(u, a){
+  if (a === 'mute') return muteBox(u);
+  if (a === 'unmute') { const { error } = await sb.rpc('admin_mute', { p_user: u.id, p_minutes: 0 }); if (error) return toast(friendly(error)); S.profiles.set(u.id, { ...u, muted_until: null }); toast(`Unmuted ${u.username}`); }
+  else if (a === 'ban' || a === 'admin') {
+    const field = a === 'ban' ? 'banned' : 'is_admin', val = !u[field];
+    if (a === 'admin' && val && !await confirmBox(`Make ${dn(u)} an admin?`, 'They’ll be able to ban, mute, and delete anything.', 'Make admin')) return;
+    const { error } = await sb.rpc('admin_set', { p_user: u.id, p_field: field, p_value: val });
+    if (error) return toast(friendly(error));
+    S.profiles.set(u.id, { ...u, [field]: val });
+    toast(field === 'banned' ? (val ? `${u.username} banned` : `${u.username} unbanned`) : (val ? `${u.username} is now admin` : 'Admin removed'));
+  } else if (a === 'purge') {
+    if (!await confirmBox(`Delete everything ${dn(u)} sent?`, 'Every message and image from them, in every channel. Can’t be undone.', 'Delete all')) return;
+    const { data, error } = await sb.rpc('admin_purge', { p_user: u.id });
+    if (error) return toast(friendly(error));
+    toast(`Deleted ${data} message${data === 1 ? '' : 's'}`); catchUp();
+  } else if (a === 'reset') {
+    if (!await confirmBox(`Reset ${dn(u)}’s password?`, 'You’ll get a temporary password to give them. Their old one stops working.', 'Reset')) return;
+    const { data, error } = await sb.rpc('admin_reset_password', { p_user: u.id });
+    if (error) return toast(friendly(error));
+    openModal(`<h3>Temporary password</h3><p class="hint">Give this to ${esc(dn(u))}. They should change it in Settings after logging in.</p><div class="key">${esc(data)}</div><div class="row"><button class="btn primary" data-close>Done</button></div>`);
+  }
+  renderMembers(); renderSidebar();
+}
 function openProfile(uid){
   const u = S.profiles.get(uid); if (!u) return;
   const me = uid === S.me.id;
+  const muted = isMuted(u);
   const html = `<div class="pc-top" style="--c:${safeColor(u.color)}"></div><div class="pc-body">${avatarHTML(u, 72, true)}
-    <div class="pc-name">${esc(u.username)}${u.is_admin ? '<span class="tag">admin</span>' : ''}${u.banned ? '<span class="tag danger">banned</span>' : ''}</div>
-    <div class="pc-sub">${S.online.has(uid) ? 'Online' : 'Offline'} · Joined ${new Date(u.created_at).toLocaleDateString([], { month: 'short', year: 'numeric' })}</div>
+    <div class="pc-name">${esc(dn(u))}${u.is_admin ? '<span class="tag">admin</span>' : ''}${u.banned ? '<span class="tag danger">banned</span>' : ''}${muted && (me || S.me.is_admin) ? '<span class="tag">muted</span>' : ''}</div>
+    <div class="pc-sub">@${esc(u.username)} · ${S.online.has(uid) ? 'Online' : 'Offline'} · Joined ${new Date(u.created_at).toLocaleDateString([], { month: 'short', year: 'numeric' })}</div>
+    ${u.status ? `<div class="pc-status">${esc(u.status)}</div>` : ''}
     ${u.bio ? `<div class="pc-bio">${esc(u.bio)}</div>` : ''}
     <div class="pc-actions">${me ? '<button class="btn" data-a="settings">Edit profile</button>' : '<button class="btn primary" data-a="dm">Message</button>'}
-    ${S.me.is_admin && !me ? `<button class="btn" data-a="ban">${u.banned ? 'Unban' : 'Ban'}</button><button class="btn" data-a="admin">${u.is_admin ? 'Remove admin' : 'Make admin'}</button>` : ''}</div></div>`;
+    ${S.me.is_admin && !me ? `<button class="btn" data-a="${muted ? 'unmute' : 'mute'}">${muted ? 'Unmute' : 'Mute'}</button><button class="btn" data-a="ban">${u.banned ? 'Unban' : 'Ban'}</button><button class="btn" data-a="admin">${u.is_admin ? 'Remove admin' : 'Make admin'}</button>` : ''}</div></div>`;
   const m = openModal(html, 'profile');
-  m.el.onclick = async e => {
+  m.el.onclick = e => {
     const b = e.target.closest('[data-a]'); if (!b) return;
-    const a = b.dataset.a;
-    if (a === 'settings') { m.close(); openSettings(); }
-    else if (a === 'dm') { m.close(); openDm(uid); }
-    else {
-      const field = a === 'ban' ? 'banned' : 'is_admin', val = !u[field];
-      const { error } = await sb.rpc('admin_set', { p_user: uid, p_field: field, p_value: val });
-      if (error) return toast(friendly(error));
-      S.profiles.set(uid, { ...u, [field]: val }); m.close(); renderMembers();
-      toast(field === 'banned' ? (val ? `${u.username} banned` : `${u.username} unbanned`) : (val ? `${u.username} is now admin` : 'Admin removed'));
-    }
+    const a = b.dataset.a; m.close();
+    if (a === 'settings') openSettings();
+    else if (a === 'dm') openDm(uid);
+    else adminAction(S.profiles.get(uid) || u, a);
   };
 }
 
+/* admin panel */
+function openAdmin(){
+  if (!S.me.is_admin) return toast('Admins only');
+  const m = openModal(`<h3>Admin panel</h3><p class="hint">You’re in charge here.</p>
+    <div class="seg" id="adTabs"><button type="button" data-t="users" class="on">Users</button><button type="button" data-t="channels">Channels</button><button type="button" data-t="stats">Stats</button></div>
+    <div id="adBody" style="margin-top:14px"></div>
+    <div class="divider"></div>
+    <p class="hint" style="margin:0;line-height:1.8">Chat commands: <code>/mute @user 10</code> <code>/unmute @user</code> <code>/ban @user</code> <code>/unban @user</code> <code>/admin</code><br>Start a message with <code>@silent</code> to ping without a sound.</p>`, 'admin');
+  const body = m.el.querySelector('#adBody');
+  let tab = 'users', q = '';
+  const draw = async () => {
+    m.el.querySelectorAll('#adTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === tab));
+    if (tab === 'users') {
+      const people = [...S.profiles.values()].filter(p => p.username.toLowerCase().includes(q) || (p.display_name || '').toLowerCase().includes(q))
+        .sort((a, b) => (b.id === S.me.id) - (a.id === S.me.id) || b.is_admin - a.is_admin || (S.online.has(b.id) - S.online.has(a.id)) || a.username.localeCompare(b.username));
+      body.innerHTML = `<input class="inp" id="adQ" placeholder="Search ${S.profiles.size} users" value="${esc(q)}" autocapitalize="off"><div style="margin-top:8px">${people.map(p => {
+        const me = p.id === S.me.id, mu = isMuted(p);
+        const flags = [p.is_admin && 'admin', p.banned && 'banned', mu && `muted ${fmtMins(Math.ceil((new Date(p.muted_until) - Date.now()) / 60000))} left`, S.online.has(p.id) && 'online'].filter(Boolean).join(' · ');
+        return `<div class="urow" data-id="${p.id}">${avatarHTML(p, 30, true)}<div class="nm">${esc(dn(p))}<span class="sub">@${esc(p.username)}${flags ? ' · ' + flags : ''}</span></div>${me ? '<span class="tag">you</span>' : `<div class="acts"><button class="btn sm" data-a="${mu ? 'unmute' : 'mute'}">${mu ? 'Unmute' : 'Mute'}</button><button class="btn sm ${p.banned ? '' : 'danger'}" data-a="ban">${p.banned ? 'Unban' : 'Ban'}</button><button class="btn sm" data-a="admin">${p.is_admin ? 'Unadmin' : 'Admin'}</button><button class="btn sm" data-a="reset">Reset pw</button><button class="btn sm danger" data-a="purge">Purge</button></div>`}</div>`;
+      }).join('')}</div>`;
+      const qi = body.querySelector('#adQ'); qi.oninput = () => { q = qi.value.trim().toLowerCase(); const pos = qi.selectionStart; draw().then(() => { const n = body.querySelector('#adQ'); n.focus(); n.setSelectionRange(pos, pos); }); };
+    } else if (tab === 'channels') {
+      const pubs = [...S.channels.values()].filter(c => c.kind === 'public');
+      body.innerHTML = `${pubs.map(c => `<div class="urow" data-ch="${c.id}"><span class="hash">#</span><div class="nm">${esc(c.name)}<span class="sub">${esc(c.topic || 'No topic')}</span></div><div class="acts"><button class="btn sm" data-a="open">Open</button><button class="btn sm danger" data-a="delch">Delete</button></div></div>`).join('')}
+        <div class="row" style="margin-top:12px"><button class="btn" id="adNewCh">${I.plus} New channel</button></div>`;
+      body.querySelector('#adNewCh').onclick = () => { m.close(); $('newChannelBtn').click(); };
+    } else {
+      body.innerHTML = '<div class="loader"><div class="spin"></div></div>';
+      const { data, error } = await sb.rpc('admin_stats');
+      if (error || !data) { body.innerHTML = `<p class="hint">${esc(friendly(error))}</p>`; return; }
+      const tiles = [['users', 'Accounts'], ['messages', 'Messages'], ['today', 'Last 24h'], ['images', 'Images'], ['channels', 'Channels'], ['groups', 'Groups'], ['dms', 'DM threads'], ['banned', 'Banned'], ['muted', 'Muted now']];
+      body.innerHTML = `<div class="stats"><div class="stat"><b>${S.online.size}</b><span>Online now</span></div>${tiles.map(([k, l]) => `<div class="stat"><b>${data[k] ?? 0}</b><span>${l}</span></div>`).join('')}</div>`;
+    }
+  };
+  m.el.querySelector('#adTabs').onclick = e => { const b = e.target.closest('[data-t]'); if (b) { tab = b.dataset.t; draw(); } };
+  body.onclick = async e => {
+    const b = e.target.closest('[data-a]'); if (!b) return;
+    const row = b.closest('.urow');
+    if (row.dataset.id) { await adminAction(S.profiles.get(row.dataset.id), b.dataset.a); draw(); return; }
+    const c = S.channels.get(row.dataset.ch); if (!c) return;
+    if (b.dataset.a === 'open') { m.close(); openChannel(c.id); return; }
+    if (!await confirmBox(`Delete #${c.name}?`, 'All messages in it will be gone for good.', 'Delete')) return;
+    const { error } = await sb.from('channels').delete().eq('id', c.id);
+    if (error) return toast(friendly(error));
+    S.channels.delete(c.id); if (S.current === c.id) openChannel(defaultChannel()); renderSidebar(); draw();
+  };
+  draw();
+}
+
 /* settings */
+async function uploadAvatar(f){
+  const bmp = await loadBitmap(f);
+  const size = 256, c = document.createElement('canvas'); c.width = c.height = size;
+  const g = c.getContext('2d'), k = Math.max(size / bmp.width, size / bmp.height), w = bmp.width * k, h = bmp.height * k;
+  g.drawImage(bmp, (size - w) / 2, (size - h) / 2, w, h);
+  const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', .85));
+  if (!blob) throw new Error('Couldn’t read that image');
+  const path = `${S.me.id}/avatar.jpg`;
+  const { error } = await sb.storage.from('avatars').upload(path, blob, { contentType: 'image/jpeg', upsert: true, cacheControl: '3600' });
+  if (error) throw error;
+  return sb.storage.from('avatars').getPublicUrl(path).data.publicUrl + '?v=' + Date.now();
+}
+async function setAvatar(url){
+  const { error } = await sb.from('profiles').update({ avatar_url: url }).eq('id', S.me.id);
+  if (error) throw error;
+  S.me = { ...S.me, avatar_url: url }; S.profiles.set(S.me.id, S.me);
+  renderMe(); renderMembers(); renderMessages(false);
+}
 function openSettings(){
   const me = S.me; let color = me.color;
-  const theme = LS.get('theme', 'light');
   const m = openModal(`<h3>Settings</h3><p class="hint">Your profile and preferences.</p>
-    <label class="field"><span>Username</span><input class="inp" id="stUser" value="${esc(me.username)}" maxlength="20" autocapitalize="off" spellcheck="false"></label>
-    <div class="field"><span>Color</span><div class="swatches" id="stColor">${PALETTE.map(c => `<button type="button" class="sw ${c === color ? 'on' : ''}" data-c="${c}" style="--c:${c}"></button>`).join('')}</div></div>
+    <div class="st-av" id="stAv">${avatarHTML(me, 64)}<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" id="stAvBtn" type="button">${me.avatar_url ? 'Change photo' : 'Add photo'}</button>${me.avatar_url ? '<button class="btn sm" id="stAvX" type="button">Remove</button>' : ''}</div><input type="file" id="stAvIn" accept="image/*" hidden></div>
+    <label class="field"><span>Display name</span><input class="inp" id="stDisp" value="${esc(me.display_name || '')}" maxlength="32" placeholder="${esc(me.username)}"></label>
+    <label class="field"><span>Username <span style="font-weight:400;color:var(--muted)">(for @mentions and login)</span></span><input class="inp" id="stUser" value="${esc(me.username)}" maxlength="20" autocapitalize="off" spellcheck="false"></label>
+    <label class="field"><span>Status</span><input class="inp" id="stStatus" value="${esc(me.status || '')}" maxlength="60" placeholder="What are you up to?"></label>
     <label class="field"><span>Bio</span><textarea class="inp" id="stBio" maxlength="190" rows="3" placeholder="Say something about yourself">${esc(me.bio)}</textarea></label>
-    <label class="field"><span>New password</span><input class="inp" id="stPass" type="password" placeholder="Leave blank to keep it" autocomplete="new-password"></label>
+    <div class="field"><span>Color</span><div class="swatches" id="stColor">${PALETTE.map(c => `<button type="button" class="sw ${c === color ? 'on' : ''}" data-c="${c}" style="--c:${c}"></button>`).join('')}</div></div>
+    <label class="field"><span>New password</span><span class="pw"><input class="inp" id="stPass" type="password" placeholder="Leave blank to keep it" autocomplete="new-password"><button class="eye" type="button" data-eye="stPass">${I.eye}</button></span></label>
     <label class="toggle"><input type="checkbox" id="stSound" ${LS.get('sound', true) ? 'checked' : ''}><span>Ping sound for DMs and @mentions</span></label>
+    <div class="divider"></div>
+    <div class="row spread" style="margin-top:0"><span class="hint" style="margin:0">Lost your recovery key?</span><button class="btn sm" id="stKey" type="button">Make a new one</button></div>
     <div class="err" id="stErr" style="margin-top:12px"></div>
     <div class="row spread"><button class="btn danger" id="stOut">Log out</button><div class="grp"><button class="btn" data-close>Cancel</button><button class="btn primary" id="stSave">Save</button></div></div>`);
-  const q = s => m.el.querySelector(s);
+  const q = x => m.el.querySelector(x), err = t => { q('#stErr').textContent = t; };
   q('#stColor').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; color = b.dataset.c; q('#stColor').querySelectorAll('.sw').forEach(x => x.classList.toggle('on', x === b)); };
   q('#stSound').onchange = e => LS.set('sound', e.target.checked);
   q('#stOut').onclick = async () => { m.close(); await sb.auth.signOut(); };
+  q('#stAvBtn').onclick = () => q('#stAvIn').click();
+  q('#stAvIn').onchange = async () => {
+    const f = q('#stAvIn').files[0]; q('#stAvIn').value = ''; if (!f) return;
+    q('#stAvBtn').disabled = true; q('#stAvBtn').textContent = 'Uploading…';
+    try { await setAvatar(await uploadAvatar(f)); m.close(); openSettings(); toast('Photo updated'); }
+    catch (e) { err(friendly(e)); q('#stAvBtn').disabled = false; q('#stAvBtn').textContent = 'Add photo'; }
+  };
+  if (q('#stAvX')) q('#stAvX').onclick = async () => {
+    try { await sb.storage.from('avatars').remove([`${S.me.id}/avatar.jpg`]); await setAvatar(null); m.close(); openSettings(); } catch (e) { err(friendly(e)); }
+  };
+  q('#stKey').onclick = async () => {
+    if (!await confirmBox('Make a new recovery key?', 'The old one stops working.', 'Make new key')) return;
+    const key = genKey();
+    const { error } = await sb.rpc('set_recovery_key', { p_key: key });
+    if (error) return toast(friendly(error));
+    showRecoveryKey(key, false);
+  };
   q('#stSave').onclick = async () => {
-    const err = t => { q('#stErr').textContent = t; };
     const name = q('#stUser').value.trim(), bio = q('#stBio').value.trim(), pass = q('#stPass').value;
+    const display_name = q('#stDisp').value.trim() || null, status = q('#stStatus').value.trim();
     if (!/^[A-Za-z0-9_.]{3,20}$/.test(name)) return err('Usernames are 3 to 20 letters, numbers, _ or .');
     if (pass && pass.length < 6) return err('Password needs at least 6 characters.');
     q('#stSave').disabled = true;
     try {
       if (name !== me.username) { const { error } = await sb.rpc('change_username', { p_new: name }); if (error) throw error; }
-      if (bio !== me.bio || color !== me.color) { const { error } = await sb.from('profiles').update({ bio, color }).eq('id', me.id); if (error) throw error; }
+      if (bio !== me.bio || color !== me.color || display_name !== (me.display_name || null) || status !== (me.status || '')) {
+        const { error } = await sb.from('profiles').update({ bio, color, display_name, status }).eq('id', me.id); if (error) throw error;
+      }
       if (pass) { const { error } = await sb.auth.updateUser({ password: pass }); if (error) throw error; }
-      S.me = { ...S.me, username: name, bio, color }; S.profiles.set(me.id, S.me); rebuildNames();
-      renderMe(); renderMembers(); renderMessages(false);
+      S.me = { ...S.me, username: name, bio, color, display_name, status }; S.profiles.set(me.id, S.me); rebuildNames();
+      renderMe(); renderMembers(); renderMessages(false); renderHeader();
       m.close(); toast('Saved');
     } catch (e) { err(friendly(e)); q('#stSave').disabled = false; }
   };
