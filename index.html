@@ -363,6 +363,15 @@ code{font-family:'Geist Mono',monospace;font-size:.88em;background:var(--sunk);p
 <body>
 <div class="boot" id="boot"><div class="spin"></div></div>
 
+<section class="auth hidden" id="wait">
+  <div class="auth-card">
+    <div class="brand"><span class="mark"></span><span class="brand-name" data-appname></span></div>
+    <h1>You’re in the waiting room</h1>
+    <p class="sub" id="waitSub">An admin needs to let you in. This page will open by itself as soon as they do, so you can leave it open.</p>
+    <div class="step" style="margin-bottom:20px"><span class="spin" style="width:18px;height:18px;flex:none;margin-top:2px"></span><p>Waiting for approval… Tell an admin your username: <b id="waitName"></b></p></div>
+    <button class="btn wide" id="waitOut" type="button">Log out</button>
+  </div>
+</section>
 <section class="auth hidden" id="auth">
   <div class="auth-card">
     <div class="brand"><span class="mark"></span><span class="brand-name" data-appname></span></div>
@@ -488,7 +497,7 @@ const genKey = () => { const a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', b = crypto.
 const S = {
   me: null, profiles: new Map(), nameIdx: new Map(),
   channels: new Map(), members: new Map(),
-  friends: new Map(),
+  friends: new Map(), waiting: new Map(),
   current: null, msgs: new Map(), byId: new Map(), reacts: new Map(), hasMore: new Map(),
   unread: new Map(), lastAt: new Map(), online: new Set(), typing: new Map(),
   pending: [], reply: null, editing: null, file: null,
@@ -627,6 +636,7 @@ $('authForm').onsubmit = async e => {
 function show(which){
   $('boot').classList.add('hidden');
   $('auth').classList.toggle('hidden', which !== 'auth');
+  $('wait').classList.toggle('hidden', which !== 'wait');
   $('app').classList.toggle('hidden', which !== 'app');
 }
 
@@ -670,6 +680,7 @@ const GUIDE = {
   ],
   admin: [
     ['🛡️', 'Admin panel', 'Tap the shield at the bottom left or type <code>/admin</code>. Mute, ban, reset passwords, wipe someone’s messages, see stats.'],
+    ['🚪', 'Waiting room', 'New accounts wait until an admin lets them in. A red number on the shield shows who\u2019s waiting. Turn it off in the <b>Waiting</b> tab.'],
     ['⏱️', 'Commands', '<code>/mute @user 10</code> (minutes)  <code>/unmute @user</code>  <code>/ban @user</code>  <code>/unban @user</code>'],
     ['📌', 'Channels', 'Only admins can make public channels. Use the <b>+</b> next to Channels.']
   ]
@@ -698,6 +709,29 @@ function openGuide(first){
 }
 $('helpBtn').innerHTML = sv('<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6"/><path d="M12 17h.01" stroke-width="2.6"/>', 19);
 $('helpBtn').onclick = () => openGuide(false);
+
+/* ---------- waiting room ---------- */
+let waitTimer = null, waitChan = null;
+function showWaiting(){
+  show('wait');
+  $('waitName').textContent = S.me.username;
+  const done = async () => {
+    clearInterval(waitTimer); waitTimer = null;
+    if (waitChan) { sb.removeChannel(waitChan); waitChan = null; }
+    await start();
+  };
+  const check = async () => {
+    const { data, error } = await sb.from('profiles').select('approved').eq('id', S.me.id).maybeSingle();
+    if (error) return;
+    if (!data) { clearInterval(waitTimer); await sb.auth.signOut(); show('auth'); authErr('An admin didn’t let this account in.'); return; }
+    if (data.approved) done();
+  };
+  clearInterval(waitTimer); waitTimer = setInterval(check, 15000);
+  if (waitChan) sb.removeChannel(waitChan);
+  waitChan = sb.channel('wait').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${S.me.id}` }, ({ new: n }) => { if (n.approved) done(); }).subscribe();
+}
+$('waitOut').onclick = async () => { clearInterval(waitTimer); if (waitChan) sb.removeChannel(waitChan); await sb.auth.signOut(); show('auth'); };
+document.addEventListener('visibilitychange', () => { if (!document.hidden && waitTimer) sb.from('profiles').select('approved').eq('id', S.me.id).maybeSingle().then(({ data }) => { if (data && data.approved) start(); }); });
 
 /* ---------- push notifications ---------- */
 const PUSH = (() => {
@@ -805,6 +839,7 @@ async function start(){
   await loadProfiles();
   S.me = S.profiles.get(session.user.id);
   if (!S.me) { await sb.auth.signOut(); show('auth'); authErr('Account not found.'); return; }
+  if (S.me.approved === false) { showWaiting(); return; }
   await loadChannels();
   await Promise.all([refreshState(), loadFriends()]);
   show('app');
@@ -822,7 +857,7 @@ function teardown(){
   if (S.rt) sb.removeChannel(S.rt);
   if (S.live) sb.removeChannel(S.live);
   Object.assign(S, { me: null, rt: null, live: null, current: null, pending: [], reply: null, editing: null, file: null });
-  [S.friends, S.profiles, S.channels, S.members, S.msgs, S.byId, S.reacts, S.unread, S.lastAt, S.typing].forEach(m => m.clear());
+  [S.friends, S.waiting, S.profiles, S.channels, S.members, S.msgs, S.byId, S.reacts, S.unread, S.lastAt, S.typing].forEach(m => m.clear());
   S.online.clear();
   closeModals(); setAuthMode('login'); show('auth');
 }
@@ -836,8 +871,9 @@ function defaultChannel(){
 async function loadProfiles(){
   const { data, error } = await sb.from('profiles').select('*');
   if (error) throw error;
-  S.profiles.clear();
-  for (const p of data) S.profiles.set(p.id, p);
+  S.profiles.clear(); S.waiting.clear();
+  const meId = (await sb.auth.getSession()).data.session?.user.id;
+  for (const p of data) (p.approved === false && p.id !== meId ? S.waiting : S.profiles).set(p.id, p);
   rebuildNames();
 }
 function rebuildNames(){ S.nameIdx.clear(); for (const p of S.profiles.values()) S.nameIdx.set(p.username.toLowerCase(), p); }
@@ -1049,8 +1085,20 @@ async function onMember({ eventType, new: n, old: o }){
   if (id === S.current) { renderHeader(); renderMembers(); }
 }
 
-function onProfile({ eventType, new: n }){
-  if (eventType === 'DELETE' || !n) return;
+function onProfile({ eventType, new: n, old: o }){
+  if (eventType === 'DELETE') {
+    const id = o && o.id; if (!id) return;
+    S.waiting.delete(id); S.profiles.delete(id); rebuildNames(); renderMe(); renderMembers(); if (adminModal) adminModal.draw(); return;
+  }
+  if (!n) return;
+  if (n.approved === false && n.id !== S.me?.id) {
+    const isNew = !S.waiting.has(n.id);
+    S.waiting.set(n.id, n); S.profiles.delete(n.id);
+    if (isNew && S.me?.is_admin) { toast(`${n.username} is in the waiting room`); ping(); }
+    renderMe(); if (adminModal) adminModal.draw();
+    return;
+  }
+  if (S.waiting.delete(n.id) && adminModal) adminModal.draw();
   S.profiles.set(n.id, n); rebuildNames();
   if (S.me && n.id === S.me.id) {
     const wasAdmin = S.me.is_admin; S.me = n; renderMe(); applyRestrictions();
@@ -1091,12 +1139,13 @@ function markRead(ch){
   if (!ch) return;
   if (S.unread.has(ch)) { S.unread.delete(ch); renderSidebar(); updateTitle(); }
   clearTimeout(S.readTimers.get(ch));
-  S.readTimers.set(ch, setTimeout(() => sb.rpc('mark_read', { ch }), 700));
+  S.readTimers.set(ch, setTimeout(() => { S.readTimers.delete(ch); sb.rpc('mark_read', { ch }).then(() => {}, () => {}); }, 300));
 }
 function updateTitle(){
   let n = 0;
   for (const [id, u] of S.unread) { const c = S.channels.get(id); if (!c) continue; n += c.kind === 'public' ? u.mentions : u.unread; }
   document.title = n ? `(${n}) ${APP_NAME}` : APP_NAME;
+  try { if (navigator.setAppBadge) n ? navigator.setAppBadge(n) : navigator.clearAppBadge(); } catch {}
 }
 let actx;
 function soundMode(){ const v = LS.get('sound', true); return v === true ? 'pings' : v === false ? 'off' : v; }
@@ -1141,7 +1190,7 @@ function chLabel(c){ return c.kind === 'dm' ? (dn(dmOther(c)) || 'Unknown') : (c
 
 function renderMe(){
   if (!S.me) return;
-  $('meBar').innerHTML = `${avatarHTML(S.me, 34, true)}<div class="who" id="meWho"><div class="nm">${esc(dn(S.me))}</div><div class="st">${S.me.banned ? 'Banned' : isMuted() ? 'Muted' : S.me.status ? esc(S.me.status) : S.me.is_admin ? 'Admin' : 'Online'}</div></div>${S.me.is_admin ? `<button class="icon-btn" id="adminBtn" title="Admin panel">${I.shield}</button>` : ''}<button class="icon-btn" id="profileBtn" title="Edit profile">${I.person}</button><button class="icon-btn" id="settingsBtn" title="Settings">${I.gearCog}</button>`;
+  $('meBar').innerHTML = `${avatarHTML(S.me, 34, true)}<div class="who" id="meWho"><div class="nm">${esc(dn(S.me))}</div><div class="st">${S.me.banned ? 'Banned' : isMuted() ? 'Muted' : S.me.status ? esc(S.me.status) : S.me.is_admin ? 'Admin' : 'Online'}</div></div>${S.me.is_admin ? `<button class="icon-btn fr-btn" id="adminBtn" title="Admin panel">${I.shield}${S.waiting.size ? `<span class="badge">${S.waiting.size}</span>` : ''}</button>` : ''}<button class="icon-btn" id="profileBtn" title="Edit profile">${I.person}</button><button class="icon-btn" id="settingsBtn" title="Settings">${I.gearCog}</button>`;
   $('profileBtn').onclick = openEditProfile;
   $('settingsBtn').onclick = openSettings;
   if (S.me.is_admin) $('adminBtn').onclick = openAdmin;
@@ -2017,17 +2066,33 @@ $('friendsBtn').onclick = () => openFriends();
 renderFriendBadge();
 
 /* admin panel */
+let adminModal = null;
 function openAdmin(){
   if (!S.me.is_admin) return toast('Admins only');
   const m = openModal(`<h3>Admin panel</h3><p class="hint">You’re in charge here.</p>
-    <div class="seg" id="adTabs"><button type="button" data-t="users" class="on">Users</button><button type="button" data-t="channels">Channels</button><button type="button" data-t="stats">Stats</button></div>
+    <div class="seg" id="adTabs"></div>
     <div id="adBody" style="margin-top:14px"></div>
     <div class="divider"></div>
     <p class="hint" style="margin:0;line-height:1.8">Chat commands: <code>/mute @user 10</code> <code>/unmute @user</code> <code>/ban @user</code> <code>/unban @user</code> <code>/admin</code><br>Start a message with <code>@silent</code> to ping without a sound.</p>`, 'admin');
   const body = m.el.querySelector('#adBody');
-  let tab = 'users', q = '';
+  let tab = S.waiting.size ? 'waiting' : 'users', q = '';
   const draw = async () => {
-    m.el.querySelectorAll('#adTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === tab));
+    m.el.querySelector('#adTabs').innerHTML = [['waiting', `Waiting${S.waiting.size ? ' · ' + S.waiting.size : ''}`], ['users', 'Users'], ['channels', 'Channels'], ['stats', 'Stats']]
+      .map(([k, l]) => `<button type="button" data-t="${k}" class="${k === tab ? 'on' : ''}">${l}</button>`).join('');
+    if (tab === 'waiting') {
+      const list = [...S.waiting.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
+      const { data: cfg } = await sb.from('app_settings').select('require_approval').eq('id', 1).maybeSingle();
+      const on = cfg ? cfg.require_approval : true;
+      body.innerHTML = `<label class="toggle" style="margin:0 0 12px"><input type="checkbox" id="adReq" ${on ? 'checked' : ''}><span>New accounts have to wait for approval</span></label>
+        ${list.map(p => `<div class="urow" data-wait="${p.id}">${avatarHTML(p, 30)}<div class="nm">${esc(p.username)}<span class="sub">Signed up ${fmtStamp(p.created_at)}</span></div><div class="acts"><button class="btn sm primary" data-a="approve">Let in</button><button class="btn sm danger" data-a="deny">Deny</button></div></div>`).join('')
+          || `<div class="pick-empty">${on ? 'No one waiting.' : 'Waiting room is off. Anyone who signs up gets in right away.'}</div>`}`;
+      body.querySelector('#adReq').onchange = async e => {
+        const { error } = await sb.rpc('admin_set_approval', { p_on: e.target.checked });
+        if (error) { toast(friendly(error)); e.target.checked = !e.target.checked; return; }
+        toast(e.target.checked ? 'Waiting room on' : 'Waiting room off'); draw();
+      };
+      return;
+    }
     if (tab === 'users') {
       const people = [...S.profiles.values()].filter(p => p.username.toLowerCase().includes(q) || (p.display_name || '').toLowerCase().includes(q))
         .sort((a, b) => (b.id === S.me.id) - (a.id === S.me.id) || b.is_admin - a.is_admin || (S.online.has(b.id) - S.online.has(a.id)) || a.username.localeCompare(b.username));
@@ -2051,9 +2116,19 @@ function openAdmin(){
     }
   };
   m.el.querySelector('#adTabs').onclick = e => { const b = e.target.closest('[data-t]'); if (b) { tab = b.dataset.t; draw(); } };
+  m.draw = draw; adminModal = m; m.onclose = () => { adminModal = null; };
   body.onclick = async e => {
     const b = e.target.closest('[data-a]'); if (!b) return;
     const row = b.closest('.urow');
+    if (row.dataset.wait) {
+      const id = row.dataset.wait, w = S.waiting.get(id), ok = b.dataset.a === 'approve';
+      if (!ok && !await confirmBox(`Deny ${w ? w.username : 'them'}?`, 'Their account gets deleted. They can sign up again.', 'Deny')) return;
+      const { error } = await sb.rpc('admin_approve', { p_user: id, p_ok: ok });
+      if (error) return toast(friendly(error));
+      if (ok && w) { S.profiles.set(id, { ...w, approved: true }); rebuildNames(); toast(`${w.username} is in`); }
+      else toast('Denied');
+      S.waiting.delete(id); renderMe(); renderMembers(); draw(); return;
+    }
     if (row.dataset.id) { await adminAction(S.profiles.get(row.dataset.id), b.dataset.a); draw(); return; }
     const c = S.channels.get(row.dataset.ch); if (!c) return;
     if (b.dataset.a === 'open') { m.close(); openChannel(c.id); return; }
