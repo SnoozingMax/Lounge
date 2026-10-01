@@ -89,6 +89,9 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
 /* sidebar */
 .side{background:var(--bg);display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line)}
 .side-head{height:58px;display:flex;align-items:center;gap:10px;padding:0 16px 0 18px;flex:none}
+.fr-btn{position:relative;margin-left:2px}
+.fr-btn .badge{position:absolute;top:1px;right:0;min-width:17px;height:17px;font-size:10px;padding:0 4px;border:2px solid var(--bg)}
+.tag.ok{background:var(--ok);color:#fff}
 .online-pill{margin-left:auto;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
 .online-pill::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 18%,transparent)}
 .side-scroll{flex:1;overflow-y:auto;padding:0 10px 12px}
@@ -359,7 +362,7 @@ code{font-family:'Geist Mono',monospace;font-size:.88em;background:var(--sunk);p
 
 <div class="app hidden" id="app">
   <aside class="side" id="side">
-    <div class="side-head"><div class="brand"><span class="mark"></span><span class="brand-name" data-appname></span></div><span class="online-pill mono" id="onlinePill">0</span></div>
+    <div class="side-head"><div class="brand"><span class="mark"></span><span class="brand-name" data-appname></span></div><span class="online-pill mono" id="onlinePill">0</span><button class="icon-btn fr-btn" id="friendsBtn" title="Friends"></button></div>
     <div class="side-scroll">
       <div class="sec"><div class="sec-h"><span>Channels</span><button class="sec-add" id="newChannelBtn" title="New channel"></button></div><div id="listPublic"></div></div>
       <div class="sec"><div class="sec-h"><span>Groups</span><button class="sec-add" id="newGroupBtn" title="New group"></button></div><div id="listGroup"></div></div>
@@ -463,6 +466,7 @@ const genKey = () => { const a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', b = crypto.
 const S = {
   me: null, profiles: new Map(), nameIdx: new Map(),
   channels: new Map(), members: new Map(),
+  friends: new Map(),
   current: null, msgs: new Map(), byId: new Map(), reacts: new Map(), hasMore: new Map(),
   unread: new Map(), lastAt: new Map(), online: new Set(), typing: new Map(),
   pending: [], reply: null, editing: null, file: null,
@@ -624,6 +628,7 @@ if (LS.get('hideMembers', false)) $('app').classList.add('no-members');
 const GUIDE = {
   basics: [
     ['💬', 'Channels, groups, DMs', 'Channels on the left are for everyone. Groups are private chats you make with the <b>+</b> next to Groups. Tap anyone’s name, then <b>Message</b>, to DM them.'],
+    ['🤝', 'Friends', 'Tap the people icon at the top left to see your friends, accept requests, and add people. You can also tap anyone\u2019s name and hit <b>Add friend</b>.'],
     ['👆', 'Hold a message', 'Press and hold any message (right-click on a computer) to <b>react</b>, <b>reply</b>, <b>copy</b>, <b>edit</b>, or <b>delete</b>.'],
     ['😭', 'Reactions', 'Hold a message and tap an emoji. Tap someone’s reaction under a message to add yours too.'],
     ['🗑️', 'Deleting', 'You can delete your own message for <b>5 minutes</b> after sending it.'],
@@ -678,7 +683,7 @@ async function start(){
   S.me = S.profiles.get(session.user.id);
   if (!S.me) { await sb.auth.signOut(); show('auth'); authErr('Account not found.'); return; }
   await loadChannels();
-  await refreshState();
+  await Promise.all([refreshState(), loadFriends()]);
   show('app');
   renderMe(); applyRestrictions();
   subscribe();
@@ -692,7 +697,7 @@ function teardown(){
   if (S.rt) sb.removeChannel(S.rt);
   if (S.live) sb.removeChannel(S.live);
   Object.assign(S, { me: null, rt: null, live: null, current: null, pending: [], reply: null, editing: null, file: null });
-  [S.profiles, S.channels, S.members, S.msgs, S.byId, S.reacts, S.unread, S.lastAt, S.typing].forEach(m => m.clear());
+  [S.friends, S.profiles, S.channels, S.members, S.msgs, S.byId, S.reacts, S.unread, S.lastAt, S.typing].forEach(m => m.clear());
   S.online.clear();
   closeModals(); setAuthMode('login'); show('auth');
 }
@@ -781,6 +786,7 @@ function subscribe(){
     .on('postgres_changes', { event: '*', schema: 'public', table: 'channels' }, onChannel)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'channel_members' }, onMember)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, onProfile)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, onFriendship)
     .subscribe(st => {
       if (st === 'SUBSCRIBED') { if (S.rtDown) { S.rtDown = false; catchUp(); } }
       else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') S.rtDown = true;
@@ -794,7 +800,7 @@ function subscribe(){
 async function catchUp(){
   if (!S.me) return;
   try {
-    await Promise.all([loadProfiles(), loadChannels()]);
+    await Promise.all([loadProfiles(), loadChannels(), loadFriends()]);
     S.me = S.profiles.get(S.me.id) || S.me;
     for (const k of [...S.msgs.keys()]) if (k !== S.current) S.msgs.delete(k);
     if (S.current && S.channels.has(S.current)) { await loadMessages(S.current); renderMessages(S.nearBottom); }
@@ -1752,11 +1758,11 @@ function openProfile(uid){
   const me = uid === S.me.id;
   const muted = isMuted(u);
   const html = `<div class="pc-top" style="--c:${safeColor(u.color)}"></div><div class="pc-body">${avatarHTML(u, 72, true)}
-    <div class="pc-name">${esc(dn(u))}${u.is_admin ? '<span class="tag">admin</span>' : ''}${u.banned ? '<span class="tag danger">banned</span>' : ''}${muted && (me || S.me.is_admin) ? '<span class="tag">muted</span>' : ''}</div>
+    <div class="pc-name">${esc(dn(u))}${u.is_admin ? '<span class="tag">admin</span>' : ''}${u.banned ? '<span class="tag danger">banned</span>' : ''}${muted && (me || S.me.is_admin) ? '<span class="tag">muted</span>' : ''}${S.friends.get(uid) === 'friends' ? '<span class="tag ok">friend</span>' : ''}</div>
     <div class="pc-sub">@${esc(u.username)} · ${S.online.has(uid) ? 'Online' : 'Offline'} · Joined ${new Date(u.created_at).toLocaleDateString([], { month: 'short', year: 'numeric' })}</div>
     ${u.status ? `<div class="pc-status">${esc(u.status)}</div>` : ''}
     ${u.bio ? `<div class="pc-bio">${esc(u.bio)}</div>` : ''}
-    <div class="pc-actions">${me ? '<button class="btn" data-a="settings">Edit profile</button>' : '<button class="btn primary" data-a="dm">Message</button>'}
+    <div class="pc-actions">${me ? '<button class="btn" data-a="settings">Edit profile</button>' : `<button class="btn primary" data-a="dm">Message</button>${friendBtnHTML(uid)}`}
     ${S.me.is_admin && !me ? `<button class="btn" data-a="${muted ? 'unmute' : 'mute'}">${muted ? 'Unmute' : 'Mute'}</button><button class="btn" data-a="ban">${u.banned ? 'Unban' : 'Ban'}</button><button class="btn" data-a="admin">${u.is_admin ? 'Remove admin' : 'Make admin'}</button>` : ''}</div></div>`;
   const m = openModal(html, 'profile');
   m.el.onclick = e => {
@@ -1764,9 +1770,110 @@ function openProfile(uid){
     const a = b.dataset.a; m.close();
     if (a === 'settings') openSettings();
     else if (a === 'dm') openDm(uid);
+    else if (a.startsWith('f-')) friendAction(uid, a.slice(2));
     else adminAction(S.profiles.get(uid) || u, a);
   };
 }
+
+/* friends */
+async function loadFriends(){
+  const { data, error } = await sb.from('friendships').select('*');
+  S.friends.clear();
+  if (error) { renderFriendBadge(); return; }
+  for (const f of data) {
+    const other = f.requester === S.me.id ? f.addressee : f.requester;
+    S.friends.set(other, f.status === 'accepted' ? 'friends' : f.requester === S.me.id ? 'out' : 'in');
+  }
+  renderFriendBadge();
+}
+function incomingCount(){ let n = 0; for (const v of S.friends.values()) if (v === 'in') n++; return n; }
+function renderFriendBadge(){
+  const n = incomingCount();
+  $('friendsBtn').innerHTML = I.people + (n ? `<span class="badge">${n > 9 ? '9+' : n}</span>` : '');
+}
+async function onFriendship({ eventType, new: n, old: o }){
+  const r = eventType === 'DELETE' ? o : n;
+  if (!r || !S.me || (r.requester !== S.me.id && r.addressee !== S.me.id)) return;
+  const other = r.requester === S.me.id ? r.addressee : r.requester;
+  const before = S.friends.get(other);
+  if (eventType === 'DELETE') S.friends.delete(other);
+  else S.friends.set(other, r.status === 'accepted' ? 'friends' : r.requester === S.me.id ? 'out' : 'in');
+  const after = S.friends.get(other), name = dn(S.profiles.get(other)) || 'Someone';
+  if (after === 'in' && before !== 'in') { toast(`${name} sent you a friend request`); ping(); }
+  if (after === 'friends' && before === 'out') { toast(`${name} accepted your friend request`); ping(); }
+  renderFriendBadge(); if (friendsModal) friendsModal.draw();
+}
+function friendBtnHTML(uid){
+  const st = S.friends.get(uid);
+  if (st === 'friends') return '<button class="btn" data-a="f-remove">Unfriend</button>';
+  if (st === 'out') return '<button class="btn" data-a="f-cancel">Requested · Cancel</button>';
+  if (st === 'in') return '<button class="btn primary" data-a="f-accept">Accept friend</button><button class="btn" data-a="f-decline">Decline</button>';
+  return '<button class="btn" data-a="f-add">Add friend</button>';
+}
+async function friendAction(uid, a){
+  const name = dn(S.profiles.get(uid));
+  let r;
+  if (a === 'add') {
+    r = await sb.rpc('friend_request', { p_user: uid });
+    if (!r.error) { S.friends.set(uid, r.data === 'friends' ? 'friends' : 'out'); toast(r.data === 'friends' ? `You and ${name} are friends` : `Friend request sent to ${name}`); }
+  } else if (a === 'accept') {
+    r = await sb.rpc('friend_accept', { p_user: uid });
+    if (!r.error) { S.friends.set(uid, 'friends'); toast(`You and ${name} are friends`); }
+  } else {
+    if (a === 'remove' && !await confirmBox(`Unfriend ${name}?`, 'You can add them again later.', 'Unfriend')) return;
+    r = await sb.rpc('friend_remove', { p_user: uid });
+    if (!r.error) S.friends.delete(uid);
+  }
+  if (r.error) toast(/friendships|function/i.test(r.error.message) ? 'Friends aren’t set up yet. Run friends.sql in Supabase.' : friendly(r.error));
+  renderFriendBadge(); if (friendsModal) friendsModal.draw();
+}
+let friendsModal = null;
+function openFriends(startTab){
+  let tab = startTab || (incomingCount() ? 'requests' : 'friends'), q = '';
+  const m = openModal(`<h3>Friends</h3><p class="hint">Add people to keep them close.</p>
+    <div class="seg" id="frTabs"></div><div id="frBody" style="margin-top:14px"></div>`, 'admin');
+  const body = m.el.querySelector('#frBody');
+  const row = (p, acts, sub) => `<div class="urow" data-id="${p.id}">${avatarHTML(p, 32, true)}<div class="nm">${esc(dn(p))}<span class="sub">${sub || '@' + esc(p.username)}</span></div><div class="acts">${acts}</div></div>`;
+  const byOnline = (a, b) => (S.online.has(b.id) - S.online.has(a.id)) || dn(a).localeCompare(dn(b));
+  const ids = st => [...S.friends].filter(([, v]) => v === st).map(([id]) => S.profiles.get(id)).filter(Boolean).sort(byOnline);
+  m.draw = () => {
+    const nIn = incomingCount();
+    m.el.querySelector('#frTabs').innerHTML = [['friends', `Friends · ${ids('friends').length}`], ['requests', `Requests${nIn ? ' · ' + nIn : ''}`], ['add', 'Add']]
+      .map(([k, l]) => `<button type="button" data-t="${k}" class="${k === tab ? 'on' : ''}">${l}</button>`).join('');
+    if (tab === 'friends') {
+      const list = ids('friends');
+      body.innerHTML = list.length ? list.map(p => row(p, `<button class="btn sm" data-a="dm">Message</button><button class="btn sm" data-a="f-remove">Unfriend</button>`, S.online.has(p.id) ? (esc(p.status) || 'Online') : 'Offline')).join('')
+        : '<div class="pick-empty">No friends yet. Tap <b>Add</b> to find people.</div>';
+    } else if (tab === 'requests') {
+      const inc = ids('in'), out = ids('out');
+      body.innerHTML = (inc.length ? `<div class="mem-h" style="margin-top:0">Incoming</div>${inc.map(p => row(p, `<button class="btn sm primary" data-a="f-accept">Accept</button><button class="btn sm" data-a="f-decline">Decline</button>`)).join('')}` : '')
+        + (out.length ? `<div class="mem-h">Sent</div>${out.map(p => row(p, `<button class="btn sm" data-a="f-cancel">Cancel</button>`)).join('')}` : '')
+        || '<div class="pick-empty">No requests right now.</div>';
+    } else {
+      const people = [...S.profiles.values()].filter(p => p.id !== S.me.id && S.friends.get(p.id) !== 'friends'
+        && (p.username.toLowerCase().includes(q) || (p.display_name || '').toLowerCase().includes(q))).sort(byOnline);
+      body.innerHTML = `<input class="inp" id="frQ" placeholder="Search people" value="${esc(q)}" autocapitalize="off" spellcheck="false"><div style="margin-top:8px">${people.map(p => {
+        const st = S.friends.get(p.id);
+        return row(p, st === 'out' ? '<button class="btn sm" data-a="f-cancel">Requested</button>' : st === 'in' ? '<button class="btn sm primary" data-a="f-accept">Accept</button>' : '<button class="btn sm" data-a="f-add">Add friend</button>');
+      }).join('') || '<div class="pick-empty">No one found</div>'}</div>`;
+      const qi = body.querySelector('#frQ');
+      qi.oninput = () => { q = qi.value.trim().toLowerCase(); const pos = qi.selectionStart; m.draw(); const n = body.querySelector('#frQ'); n.focus(); n.setSelectionRange(pos, pos); };
+    }
+  };
+  m.el.querySelector('#frTabs').onclick = e => { const b = e.target.closest('[data-t]'); if (b) { tab = b.dataset.t; m.draw(); } };
+  body.onclick = e => {
+    const b = e.target.closest('[data-a]'), r = e.target.closest('.urow');
+    if (!r) return;
+    const uid = r.dataset.id;
+    if (!b) { openProfile(uid); return; }
+    if (b.dataset.a === 'dm') { m.close(); openDm(uid); return; }
+    friendAction(uid, b.dataset.a.slice(2));
+  };
+  friendsModal = m; m.onclose = () => { friendsModal = null; };
+  m.draw();
+}
+$('friendsBtn').onclick = () => openFriends();
+renderFriendBadge();
 
 /* admin panel */
 function openAdmin(){
