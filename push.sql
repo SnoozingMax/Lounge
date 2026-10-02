@@ -50,6 +50,7 @@ begin
        (c.kind <> 'public' and exists (select 1 from channel_members m where m.channel_id = c.id and m.user_id = ps.user_id))
        or (c.kind = 'public' and (
              ps.mode = 'all'
+             or (s.is_admin and new.content ~* '(^|[^A-Za-z0-9_])@everyone([^A-Za-z0-9_.]|$)')
              or new.content ~* ('(^|[^A-Za-z0-9_])@' || regexp_replace(p.username, '([.])', '\\\1', 'g') || '([^A-Za-z0-9_.]|$)')
           ))
      );

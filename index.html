@@ -181,6 +181,8 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
 .mn{background:var(--accent-soft);color:var(--accent-2);font-weight:600;border-radius:5px;padding:0 3px;cursor:pointer}
 [data-theme="dark"] .mn{color:#ff9a7a}
 .edited{font-size:11px;color:var(--muted)}
+.mn.mn-all{cursor:default}
+.av svg{width:60%;height:60%}
 .silent{font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:0 5px;margin-left:4px;vertical-align:1px}
 .att{display:block;max-width:min(380px,100%);max-height:340px;border-radius:12px;margin-top:6px;border:1px solid var(--line);cursor:zoom-in;background:var(--sunk)}
 .reply-ref{grid-column:2;font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center;margin-bottom:3px;cursor:pointer;min-width:0;white-space:nowrap;position:relative}
@@ -720,6 +722,9 @@ function showLogin(){
 
 /* update log: newest first. Add a new entry at the top for every update. */
 const UPDATES = [
+  { id: '2026-10-02c', date: 'Oct 2', items: [
+    ['📢', 'Admins can ping the whole channel with <code>@everyone</code>.']
+  ]},
   { id: '2026-10-02b', date: 'Oct 2', items: [
     ['👋', 'New members get a welcome tour the first time they join. Everyone else just sees this update log.']
   ]},
@@ -796,6 +801,7 @@ const GUIDE = {
   admin: [
     ['🛡️', 'Admin panel', 'Tap the shield at the bottom left or type <code>/admin</code>. Mute, ban, reset passwords, wipe someone’s messages, see stats.'],
     ['🚪', 'Waiting room', 'New accounts wait until an admin lets them in. A red number on the shield shows who\u2019s waiting. Turn it off in the <b>Waiting</b> tab.'],
+    ['📢', '@everyone', 'Type <code>@everyone</code> to ping everyone in the channel (or everyone in a group). Only admins can use it.'],
     ['⏱️', 'Commands', '<code>/mute @user 10</code> (minutes)  <code>/unmute @user</code>  <code>/ban @user</code>  <code>/unban @user</code>'],
     ['📌', 'Channels', 'Only admins can make public channels. Use the <b>+</b> next to Channels.']
   ]
@@ -1123,7 +1129,7 @@ function onMsg({ eventType, new: n, old: o }){
     }
     if (n.user_id !== S.me.id) {
       const c = S.channels.get(n.channel_id);
-      const mention = mentionsMe(n.content), silent = /^@silent\b/i.test(n.content || '');
+      const mention = mentionsMe(n.content, n.user_id), silent = /^@silent\b/i.test(n.content || '');
       const watching = here && !document.hidden && S.nearBottom;
       if (watching) markRead(n.channel_id);
       else {
@@ -1420,11 +1426,14 @@ function renderPresence(){
 }
 
 /* ---------- rendering: messages ---------- */
-function mentionsMe(text){
+const EVERYONE_RE = /(^|[^\w])@everyone(?![\w.])/i;
+function isEveryone(text, sender){ return !!text && EVERYONE_RE.test(text) && !!S.profiles.get(sender)?.is_admin; }
+function mentionsMe(text, sender){
   if (!S.me || !text) return false;
+  if (sender !== S.me.id && isEveryone(text, sender)) return true;
   return new RegExp('(^|[^\\w])@' + escRe(S.me.username) + '(?![\\w.])', 'i').test(text);
 }
-function fmt(src){
+function fmt(src, sender){
   const ph = [];
   const hold = h => { ph.push(h); return `\uE000${ph.length - 1}\uE001`; };
   let s = esc(String(src).replace(/[\uE000\uE001]/g, ''));
@@ -1435,6 +1444,7 @@ function fmt(src){
   s = s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
   s = s.replace(/~~([^~\n]+)~~/g, '<s>$1</s>');
   s = s.replace(/(^|\n)&gt; ?([^\n]*)/g, '$1<blockquote>$2</blockquote>');
+  if (sender && S.profiles.get(sender)?.is_admin) s = s.replace(/(^|[^\w])@everyone(?![\w.])/gi, (m, pre) => pre + hold('<span class="mn mn-all">@everyone</span>'));
   s = s.replace(/(^|[^\w])@([A-Za-z0-9_.]{3,20})/g, (m, pre, name) => {
     const p = S.nameIdx.get(name.toLowerCase().replace(/\.+$/, ''));
     if (!p) return m;
@@ -1464,7 +1474,7 @@ function msgEl(m, prev){
   const u = S.profiles.get(m.user_id) || { id: '', username: 'unknown', color: '#8b8982' };
   const compact = isCompact(m, prev);
   const el = document.createElement('div');
-  el.className = 'msg' + (compact ? ' compact' : '') + (m.pending ? ' pending' : '') + (!m.pending && m.user_id !== S.me.id && mentionsMe(m.content) ? ' mention' : '');
+  el.className = 'msg' + (compact ? ' compact' : '') + (m.pending ? ' pending' : '') + (!m.pending && m.user_id !== S.me.id && mentionsMe(m.content, m.user_id) ? ' mention' : '');
   el.dataset.id = m.id;
   let h = '';
   if (m.reply_to) {
@@ -1476,7 +1486,7 @@ function msgEl(m, prev){
   if (!compact) h += `<div class="meta"><button class="name" data-user="${u.id}">${esc(dn(u))}</button>${u.is_admin ? '<span class="tag">admin</span>' : ''}<time title="${esc(new Date(m.created_at).toLocaleString())}">${fmtStamp(m.created_at)}</time></div>`;
   const silent = /^@silent\b/i.test(m.content || '');
   const body = silent ? m.content.replace(/^@silent\s*/i, '') : m.content;
-  if (m.content) h += `<div class="text">${fmt(body)}${silent ? '<span class="silent">silent</span>' : ''}${m.edited_at ? ' <span class="edited">(edited)</span>' : ''}</div>`;
+  if (m.content) h += `<div class="text">${fmt(body, m.user_id)}${silent ? '<span class="silent">silent</span>' : ''}${m.edited_at ? ' <span class="edited">(edited)</span>' : ''}</div>`;
   if (m.image_url && (m.image_url.startsWith(IMG_PREFIX) || m.image_url.startsWith('blob:'))) h += `<img class="att" src="${esc(m.image_url)}" alt="" loading="lazy">`;
   if (!m.pending) h += reactsHTML(m.id);
   h += '</div>';
@@ -1867,15 +1877,16 @@ function updateMentions(){
   if (!m) return hideMentions();
   const q = m[1].toLowerCase(), c = S.channels.get(S.current);
   const pool = c.kind === 'public' ? [...S.profiles.values()] : [...(S.members.get(c.id) || [])].map(id => S.profiles.get(id)).filter(Boolean);
-  const items = pool.filter(p => p.id !== S.me.id && p.username.toLowerCase().startsWith(q))
+  let items = pool.filter(p => p.id !== S.me.id && p.username.toLowerCase().startsWith(q))
     .sort((a, b) => (S.online.has(b.id) - S.online.has(a.id)) || a.username.localeCompare(b.username)).slice(0, 6);
+  if (S.me.is_admin && 'everyone'.startsWith(q)) items.unshift({ id: '', username: 'everyone', all: true });
   if (!items.length) return hideMentions();
   mst = { items, idx: 0, start: pos - m[1].length - 1 };
   drawMentions();
 }
 function drawMentions(){
   const el = $('mentionList');
-  el.innerHTML = mst.items.map((p, i) => `<button type="button" class="${i === mst.idx ? 'on' : ''}" data-i="${i}">${avatarHTML(p, 24, true).replace('data-user=', 'data-x=')}<span>${esc(dn(p))}${p.display_name ? ` <span style="color:var(--muted);font-weight:400">@${esc(p.username)}</span>` : ''}</span></button>`).join('');
+  el.innerHTML = mst.items.map((p, i) => p.all ? `<button type="button" class="${i === mst.idx ? 'on' : ''}" data-i="${i}"><span class="av" style="--c:var(--accent);--s:24px">${I.people}</span><span>@everyone <span style="color:var(--muted);font-weight:400">pings everyone here</span></span></button>` : `<button type="button" class="${i === mst.idx ? 'on' : ''}" data-i="${i}">${avatarHTML(p, 24, true).replace('data-user=', 'data-x=')}<span>${esc(dn(p))}${p.display_name ? ` <span style="color:var(--muted);font-weight:400">@${esc(p.username)}</span>` : ''}</span></button>`).join('');
   el.classList.remove('hidden');
 }
 function hideMentions(){ $('mentionList').classList.add('hidden'); }
