@@ -718,6 +718,56 @@ function showLogin(){
   document.hasStorageAccess().then(has => row.classList.toggle('hidden', has)).catch(() => row.classList.add('hidden'));
 }
 
+/* update log: newest first. Add a new entry at the top for every update. */
+const UPDATES = [
+  { id: '2026-10-02a', date: 'Oct 2', items: [
+    ['⏳', 'Messages now disappear after <b>7 days</b>, and so do pictures.'],
+    ['✕', 'Close DMs with the little <b>✕</b> next to them. They come back if someone messages you.'],
+    ['📋', 'This update log replaces the welcome tour. The <b>?</b> at the top still opens the full guide.']
+  ]},
+  { id: '2026-10-01b', date: 'Oct 1', items: [
+    ['🔐', 'You stay signed in now, even on bad Wi-Fi.'],
+    ['🚪', 'New accounts wait in a waiting room until an admin lets them in.'],
+    ['♡', '<b>Friends</b> has its own spot at the top of the sidebar.'],
+    ['😭', 'The reaction bar closes when you tap somewhere else.'],
+    ['🔔', 'Ping sound options and a Test button in Settings.']
+  ]},
+  { id: '2026-10-01a', date: 'Oct 1', items: [
+    ['👤', 'Profile pics, display names, statuses, and bios.'],
+    ['👆', 'Hold a message to react, reply, copy, edit, or delete.'],
+    ['🤫', 'Start a message with <code>@silent</code> to ping without sound.']
+  ]}
+];
+function showUpdates(){
+  const key = 'seenUpdate:' + S.me.id, seen = LS.get(key, null);
+  let fresh = seen ? UPDATES.slice(0, Math.max(0, UPDATES.findIndex(u => u.id === seen))) : UPDATES.slice(0, 1);
+  if (seen && !UPDATES.some(u => u.id === seen)) fresh = UPDATES.slice(0, 1);
+  LS.set(key, UPDATES[0].id);
+  if (!fresh.length) return;
+  const m = openModal(`<h3>What’s new</h3><p class="hint">Changed since you were last here.</p>
+    ${fresh.map(u => `<div class="mem-h" style="margin-top:12px">${esc(u.date)}</div><div class="guide">${u.items.map(([ic, t]) => `<div class="g-row"><span class="g-ic">${ic}</span><div><p>${t}</p></div></div>`).join('')}</div>`).join('')}
+    <div class="row"><button class="btn" id="upGuide">Full guide</button><button class="btn primary" data-close>Got it</button></div>`);
+  m.el.querySelector('#upGuide').onclick = () => { m.close(); openGuide(false); };
+}
+
+/* admins quietly delete picture files older than 7 days (once a day) */
+async function cleanOldImages(){
+  const key = 'imgClean:' + S.me.id;
+  if (Date.now() - LS.get(key, 0) < 86400000) return;
+  LS.set(key, Date.now());
+  try {
+    const cutoff = Date.now() - 7 * 86400000;
+    const { data: folders, error } = await sb.storage.from('attachments').list('', { limit: 1000 });
+    if (error || !folders) return;
+    for (const f of folders) {
+      if (f.id) continue; // a file at the top level, skip; folders have no id
+      const { data: files } = await sb.storage.from('attachments').list(f.name, { limit: 1000, sortBy: { column: 'created_at', order: 'asc' } });
+      const old = (files || []).filter(x => x.id && Date.parse(x.created_at) < cutoff).map(x => `${f.name}/${x.name}`);
+      for (let i = 0; i < old.length; i += 100) await sb.storage.from('attachments').remove(old.slice(i, i + 100));
+    }
+  } catch {}
+}
+
 /* how-it-works guide */
 const GUIDE = {
   basics: [
@@ -725,7 +775,7 @@ const GUIDE = {
     ['🤝', 'Friends', 'Tap <b>Friends</b> (the heart) at the top of the sidebar to see your friends, accept requests, and add people. You can also tap anyone\u2019s name and hit <b>Add friend</b>.'],
     ['👆', 'Hold a message', 'Press and hold any message (right-click on a computer) to <b>react</b>, <b>reply</b>, <b>copy</b>, <b>edit</b>, or <b>delete</b>.'],
     ['😭', 'Reactions', 'Hold a message and tap an emoji. Tap someone’s reaction under a message to add yours too.'],
-    ['🗑️', 'Deleting', 'You can delete your own message for <b>5 minutes</b> after sending it.'],
+    ['🗑️', 'Deleting', 'You can delete your own message for <b>5 minutes</b> after sending it. Everything disappears on its own after <b>7 days</b>.'],
     ['🖼️', 'Pictures', 'Tap the image button next to the text box, or paste one. They get shrunk automatically.']
   ],
   pings: [
@@ -922,8 +972,9 @@ async function start(){
   if (fromUrl) history.replaceState(null, '', location.pathname);
   await openChannel(fromUrl && S.channels.has(fromUrl) ? fromUrl : last && S.channels.has(last) ? last : defaultChannel());
   syncPush(); refreshPushBar();
-  if (!LS.get('guideSeen:' + S.me.id, false) && !justSignedUp) openGuide(true);
-  if (justSignedUp) { justSignedUp = false; openGuide(false); LS.set('guideSeen:' + S.me.id, true); }
+  if (justSignedUp) { justSignedUp = false; LS.set('seenUpdate:' + S.me.id, UPDATES[0].id); }
+  else showUpdates();
+  if (S.me.is_admin) cleanOldImages();
 }
 
 function teardown(){
@@ -1436,9 +1487,9 @@ function topEl(){
   if (S.hasMore.get(S.current)) { d.className = 'loader'; d.innerHTML = '<div class="spin"></div>'; return d; }
   const c = S.channels.get(S.current);
   d.className = 'intro';
-  if (c.kind === 'public') d.innerHTML = `<div class="big">#</div><h2>Welcome to #${esc(c.name)}</h2><p>${c.topic ? esc(c.topic) : 'This is the very start of the channel.'}</p>`;
-  else if (c.kind === 'group') d.innerHTML = `<div class="big">${sv('<circle cx="9" cy="9" r="3"/><circle cx="16.5" cy="10" r="2.4"/><path d="M3.5 18.5c.7-2.6 2.8-4 5.5-4s4.8 1.4 5.5 4M15 14.6c2.3-.3 4.4.9 5.2 3.4"/>', 30)}</div><h2>${esc(c.name)}</h2><p>The start of your group. Only members can see this.</p>`;
-  else { const o = dmOther(c); d.innerHTML = `<div style="margin-bottom:16px">${avatarHTML(o, 60)}</div><h2>${esc(o?.username || 'Unknown')}</h2><p>This is the start of your DMs with <b>${esc(o?.username || '')}</b>.</p>`; }
+  if (c.kind === 'public') d.innerHTML = `<div class="big">#</div><h2>Welcome to #${esc(c.name)}</h2><p>${c.topic ? esc(c.topic) : 'This is the very start of the channel.'} Messages disappear after 7 days.</p>`;
+  else if (c.kind === 'group') d.innerHTML = `<div class="big">${sv('<circle cx="9" cy="9" r="3"/><circle cx="16.5" cy="10" r="2.4"/><path d="M3.5 18.5c.7-2.6 2.8-4 5.5-4s4.8 1.4 5.5 4M15 14.6c2.3-.3 4.4.9 5.2 3.4"/>', 30)}</div><h2>${esc(c.name)}</h2><p>The start of your group. Only members can see this. Messages disappear after 7 days.</p>`;
+  else { const o = dmOther(c); d.innerHTML = `<div style="margin-bottom:16px">${avatarHTML(o, 60)}</div><h2>${esc(o?.username || 'Unknown')}</h2><p>This is the start of your DMs with <b>${esc(o?.username || '')}</b>. Messages disappear after 7 days.</p>`; }
   return d;
 }
 
