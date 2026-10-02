@@ -216,6 +216,7 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
 .jump{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 6px);height:32px;padding:0 14px;border-radius:16px;background:var(--ink);color:var(--bg);font-size:13px;font-weight:600;box-shadow:var(--shadow);z-index:3}
 .typing{height:24px;font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:7px;padding-left:4px;white-space:nowrap;overflow:hidden}
 .typing b{color:var(--ink-2);font-weight:650}
+.exp-note{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);opacity:.75}
 .tdots{display:inline-flex;gap:3px}
 .tdots i{width:4px;height:4px;border-radius:50%;background:var(--muted);animation:bob 1s infinite}
 .tdots i:nth-child(2){animation-delay:.15s}
@@ -507,6 +508,7 @@ const I = {
   shield: sv('<path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6l7-3z"/><path d="m9 12 2 2 4-4"/>', 18),
   gearCog: sv('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>', 18),
   heart: sv('<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>', 17),
+  clock: sv('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', 12),
   eye: sv('<path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>', 18),
   eyeOff: sv('<path d="M3 3l18 18M10.6 10.6a2.8 2.8 0 0 0 3.9 3.9M7.4 7.5C4.6 9.1 2.5 12 2.5 12s3.5 6.5 9.5 6.5c1.6 0 3-.4 4.3-1M9.9 5.8C10.6 5.6 11.3 5.5 12 5.5c6 0 9.5 6.5 9.5 6.5s-.9 1.7-2.6 3.3"/>', 18)
 };
@@ -722,6 +724,9 @@ function showLogin(){
 
 /* update log: newest first. Add a new entry at the top for every update. */
 const UPDATES = [
+  { id: '2026-10-02d', date: 'Oct 2', items: [
+    ['🕒', 'A small note above the message box reminds you messages disappear after 7 days. Hold a message to see how long it has left.']
+  ]},
   { id: '2026-10-02c', date: 'Oct 2', items: [
     ['📢', 'Admins can ping the whole channel with <code>@everyone</code>.']
   ]},
@@ -1263,7 +1268,7 @@ function clearTyping(c, u){ const m = S.typing.get(c); if (m && m.has(u)) { clea
 function renderTyping(){
   const m = S.typing.get(S.current);
   const names = m ? [...m.keys()].map(id => dn(S.profiles.get(id))).filter(Boolean) : [];
-  if (!names.length) { $('typing').innerHTML = ''; return; }
+  if (!names.length) { $('typing').innerHTML = `<span class="exp-note">${I.clock} Messages disappear after 7 days</span>`; return; }
   const who = names.length === 1 ? `<b>${esc(names[0])}</b> is typing`
     : names.length === 2 ? `<b>${esc(names[0])}</b> and <b>${esc(names[1])}</b> are typing`
     : 'Several people are typing';
@@ -1454,6 +1459,12 @@ function fmt(src, sender){
   s = s.replace(/\n/g, '<br>').replace(/<\/blockquote><br>/g, '</blockquote>');
   return s.replace(/\uE000(\d+)\uE001/g, (_, i) => ph[+i]);
 }
+function expiresIn(t){
+  const ms = Date.parse(t) + 7 * 86400000 - Date.now();
+  if (ms <= 3600000) return 'disappears within the hour';
+  const d = Math.round(ms / 86400000), h = Math.round(ms / 3600000);
+  return 'disappears in ' + (ms >= 36 * 3600000 ? `${d} day${d === 1 ? '' : 's'}` : `${h} hour${h === 1 ? '' : 's'}`);
+}
 function snippet(m){ return m.content ? m.content.replace(/\s+/g, ' ').slice(0, 90) : 'Image'; }
 
 function isCompact(m, prev){
@@ -1483,7 +1494,7 @@ function msgEl(m, prev){
   }
   h += compact ? `<div class="gutter"><time>${fmtTime(m.created_at)}</time></div>` : `<div class="gutter">${avatarHTML(u, 38)}</div>`;
   h += '<div class="body">';
-  if (!compact) h += `<div class="meta"><button class="name" data-user="${u.id}">${esc(dn(u))}</button>${u.is_admin ? '<span class="tag">admin</span>' : ''}<time title="${esc(new Date(m.created_at).toLocaleString())}">${fmtStamp(m.created_at)}</time></div>`;
+  if (!compact) h += `<div class="meta"><button class="name" data-user="${u.id}">${esc(dn(u))}</button>${u.is_admin ? '<span class="tag">admin</span>' : ''}<time title="${esc(new Date(m.created_at).toLocaleString() + ' \u00b7 ' + expiresIn(m.created_at))}">${fmtStamp(m.created_at)}</time></div>`;
   const silent = /^@silent\b/i.test(m.content || '');
   const body = silent ? m.content.replace(/^@silent\s*/i, '') : m.content;
   if (m.content) h += `<div class="text">${fmt(body, m.user_id)}${silent ? '<span class="silent">silent</span>' : ''}${m.edited_at ? ' <span class="edited">(edited)</span>' : ''}</div>`;
@@ -1619,7 +1630,7 @@ function openSheet(id){
   const u = S.profiles.get(m.user_id);
   const mine = m.user_id === S.me.id, canAct = !S.me.banned && !isMuted();
   document.querySelectorAll('.msg.sel').forEach(x => x.classList.remove('sel'));
-  const sh = openModal(`<div class="sheet-head">${avatarHTML(u, 30)}<div class="sh-t"><b>${esc(dn(u) || 'unknown')}</b><span>${esc(snippet(m))}</span></div></div>
+  const sh = openModal(`<div class="sheet-head">${avatarHTML(u, 30)}<div class="sh-t"><b>${esc(dn(u) || 'unknown')} <span style="font-weight:400;color:var(--muted);font-size:12px">\u00b7 ${expiresIn(m.created_at)}</span></b><span>${esc(snippet(m))}</span></div></div>
     ${canAct ? `<div class="sheet-react">${SHEET_EMOJI.map(e => `<button data-e="${e}" class="${S.reacts.get(id)?.get(e)?.has(S.me.id) ? 'on' : ''}">${e}</button>`).join('')}<button data-a="more" title="More reactions">${I.plusBig}</button></div>` : ''}
     <div class="sheet-list">
       ${canAct ? `<button data-a="reply">${I.reply}<span>Reply</span></button>` : ''}
