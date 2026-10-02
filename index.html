@@ -720,6 +720,9 @@ function showLogin(){
 
 /* update log: newest first. Add a new entry at the top for every update. */
 const UPDATES = [
+  { id: '2026-10-02b', date: 'Oct 2', items: [
+    ['👋', 'New members get a welcome tour the first time they join. Everyone else just sees this update log.']
+  ]},
   { id: '2026-10-02a', date: 'Oct 2', items: [
     ['⏳', 'Messages now disappear after <b>7 days</b>, and so do pictures.'],
     ['✕', 'Close DMs with the little <b>✕</b> next to them. They come back if someone messages you.'],
@@ -972,7 +975,10 @@ async function start(){
   if (fromUrl) history.replaceState(null, '', location.pathname);
   await openChannel(fromUrl && S.channels.has(fromUrl) ? fromUrl : last && S.channels.has(last) ? last : defaultChannel());
   syncPush(); refreshPushBar();
-  if (justSignedUp) { justSignedUp = false; LS.set('seenUpdate:' + S.me.id, UPDATES[0].id); }
+  // brand-new members get the welcome tour once; everyone else gets the update log
+  const newbie = justSignedUp || (!LS.get('guideSeen:' + S.me.id, false) && Date.now() - Date.parse(S.me.created_at) < 2 * 86400000);
+  justSignedUp = false;
+  if (newbie) { LS.set('seenUpdate:' + S.me.id, UPDATES[0].id); openGuide(true); }
   else showUpdates();
   if (S.me.is_admin) cleanOldImages();
 }
