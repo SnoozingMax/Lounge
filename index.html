@@ -99,6 +99,10 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
 .fr-btn .badge{position:absolute;top:1px;right:0;min-width:17px;height:17px;font-size:10px;padding:0 4px;border:2px solid var(--bg)}
 .tag.ok{background:var(--ok);color:#fff}
 .fr-row{margin-top:6px;font-weight:600}
+.ch-x{width:22px;height:22px;border-radius:6px;display:none;place-items:center;color:var(--muted);flex:none;margin-right:-2px}
+.ch-x:hover{background:var(--line);color:var(--ink)}
+.ch:hover .ch-x,.ch.active .ch-x{display:grid}
+@media (hover:none){.ch-x{display:grid}}
 .fr-row .fr-n{font-size:12px;color:var(--muted);font-family:'Geist Mono',monospace}
 .online-pill{margin-left:auto;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
 .online-pill::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 18%,transparent)}
@@ -1289,7 +1293,7 @@ function renderSidebar(){
   const byAct = (a, b) => (S.lastAt.get(b.id) || b.created_at).localeCompare(S.lastAt.get(a.id) || a.created_at);
   const pub = all.filter(c => c.kind === 'public');
   const grp = all.filter(c => c.kind === 'group').sort(byAct);
-  const dms = all.filter(c => c.kind === 'dm').sort(byAct);
+  const dms = all.filter(c => c.kind === 'dm' && (c.id === S.current || !dmClosed(c))).sort(byAct);
   $('listPublic').innerHTML = pub.map(chItem).join('') || '<div class="empty-sec">No channels yet</div>';
   $('listGroup').innerHTML = grp.map(chItem).join('') || '<div class="empty-sec">No groups yet</div>';
   $('listDm').innerHTML = dms.map(chItem).join('') || '<div class="empty-sec">No DMs yet</div>';
@@ -1301,9 +1305,25 @@ function chItem(c){
     : c.kind === 'group' ? `<span class="gicon">${I.group}</span>`
     : avatarHTML(dmOther(c), 22, true).replace('data-user=', 'data-x=');
   const cls = ['ch', c.id === S.current ? 'active' : '', u && u.unread && c.id !== S.current ? 'unread' : ''].join(' ');
-  return `<button class="${cls}" data-ch="${c.id}">${icon}<span class="lbl">${esc(chLabel(c))}</span>${n && c.id !== S.current ? `<span class="badge">${n > 99 ? '99+' : n}</span>` : ''}</button>`;
+  const x = c.kind === 'dm' ? `<span class="ch-x" data-close="${c.id}" role="button" title="Close DM">${I.x}</span>` : '';
+  return `<button class="${cls}" data-ch="${c.id}">${icon}<span class="lbl">${esc(chLabel(c))}</span>${n && c.id !== S.current ? `<span class="badge">${n > 99 ? '99+' : n}</span>` : ''}${x}</button>`;
 }
+/* closed DMs: hidden until a newer message shows up (saved per account on this device) */
+const closedKey = () => 'closedDms:' + (S.me ? S.me.id : '');
+function dmClosed(c){
+  const at = LS.get(closedKey(), {})[c.id];
+  if (!at) return false;
+  const last = S.lastAt.get(c.id);
+  return !(last && Date.parse(last) > Date.parse(at));
+}
+function closeDm(id){
+  const m = LS.get(closedKey(), {}); m[id] = S.lastAt.get(id) || '1970-01-01T00:00:00Z'; LS.set(closedKey(), m);
+  if (S.current === id) openChannel(defaultChannel()); else renderSidebar();
+}
+function reopenDm(id){ const m = LS.get(closedKey(), {}); if (m[id]) { delete m[id]; LS.set(closedKey(), m); } }
 $('side').addEventListener('click', e => {
+  const x = e.target.closest('[data-close]');
+  if (x) { e.stopPropagation(); closeDm(x.dataset.close); return; }
   const b = e.target.closest('[data-ch]');
   if (b) openChannel(b.dataset.ch);
 });
@@ -1898,6 +1918,7 @@ function peoplePicker(host, { multi, exclude = new Set(), onPick }){
 async function openDm(uid){
   const { data, error } = await sb.rpc('open_dm', { other: uid });
   if (error) { toast(friendly(error)); return; }
+  reopenDm(data);
   if (await ensureChannel(data)) openChannel(data);
 }
 $('newDmBtn').onclick = () => {
