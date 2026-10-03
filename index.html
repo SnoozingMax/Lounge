@@ -529,7 +529,7 @@ const S = {
 };
 
 let sb = null;
-try { if (!SUPABASE_URL.includes('PASTE')) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } }); } catch (e) { sb = null; }
+try { if (!SUPABASE_URL.includes('PASTE')) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }, realtime: { worker: true, heartbeatIntervalMs: 25000 } }); } catch (e) { sb = null; }
 
 /* ---------- theme ---------- */
 function applyTheme(t){
@@ -724,6 +724,9 @@ function showLogin(){
 
 /* update log: newest first. Add a new entry at the top for every update. */
 const UPDATES = [
+  { id: '2026-10-03a', date: 'Oct 3', items: [
+    ['🔢', 'The tab number and ping keep working when the chat sits in the background for a long time.']
+  ]},
   { id: '2026-10-02d', date: 'Oct 2', items: [
     ['🕒', 'A small note above the message box reminds you messages disappear after 7 days. Hold a message to see how long it has left.']
   ]},
@@ -1046,7 +1049,8 @@ async function ensureChannel(id){
 }
 
 async function refreshState(){
-  const { data } = await sb.rpc('channel_state');
+  const { data, error } = await sb.rpc('channel_state');
+  if (error || !data) return;
   S.unread.clear();
   for (const r of data || []) {
     S.unread.set(r.channel_id, { unread: r.unread, mentions: r.mentions });
@@ -1111,6 +1115,22 @@ async function catchUp(){
     renderMe(); renderHeader(); renderMembers(); applyRestrictions();
   } catch {}
 }
+
+/* while the tab is in the background, check every minute in case the live connection fell asleep */
+function loudCount(){
+  const mode = soundMode(); let n = 0;
+  for (const [id, u] of S.unread) {
+    const c = S.channels.get(id); if (!c) continue;
+    n += mode === 'all' ? u.unread : c.kind === 'public' ? u.mentions : u.unread;
+  }
+  return n;
+}
+setInterval(async () => {
+  if (!S.me || !document.hidden || !S.live) return;
+  const before = loudCount();
+  await refreshState();
+  if (loudCount() > before && soundMode() !== 'off') ping();
+}, 60000);
 
 document.addEventListener('visibilitychange', () => {
   if (!S.me) return;
