@@ -62,7 +62,7 @@ begin
                else '📷 Image' end;
 
   perform net.http_post(
-    url := 'https://nomtlkkplbtnqaxezzoy.supabase.co/functions/v1/push',
+    url := 'https://nomtlkkplbtnqaxezzoy.supabase.co/functions/v1/Push',
     body := jsonb_build_object(
       'title', ttl, 'body', body, 'tag', c.id, 'channel', c.id,
       'silent', new.content ~* '^@silent', 'subs', subs),
