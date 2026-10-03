@@ -905,7 +905,7 @@ async function saveSub(sub){
 async function enablePush(){
   const reg = await swReady(); if (!reg) throw new Error('Notifications aren’t supported here');
   const perm = await Notification.requestPermission();
-  if (perm !== 'granted') throw new Error(perm === 'denied' ? 'Notifications are blocked. Allow them in your browser settings.' : 'You need to tap Allow');
+  if (perm !== 'granted') throw new Error(perm === 'denied' ? (PUSH.ios ? 'The iPad blocked it without asking. Check Settings → Notifications, or the school may block it.' : 'Blocked. Allow notifications in your browser settings.') : 'You need to tap Allow');
   let sub = await reg.pushManager.getSubscription();
   if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(VAPID_PUBLIC) });
   await saveSub(sub);
@@ -947,10 +947,11 @@ async function openNotifySetup(){
     <div class="step"><span class="n">4</span><p>Close Safari and open the new <b>Lounge</b> icon on your Home Screen. Log in, then tap <b>Set up</b> again and <b>Allow</b>.</p></div></div>
     <p class="hint" style="margin-top:8px">Don’t see Add to Home Screen? Make sure you’re in <b>Safari</b>, and scroll the list down.</p>
     <div class="row"><button class="btn primary" data-close>Got it</button></div>`;
-  else if (st === 'blocked') html = `<h3>Notifications are blocked</h3><p class="hint">You tapped Block at some point, so the browser won’t ask again. To fix it:</p>
-    <div class="steps">${PUSH.ios ? `<div class="step"><span class="n">1</span><p>Open the iPad <b>Settings</b> app → <b>Notifications</b> → <b>Lounge</b> → turn on <b>Allow Notifications</b>.</p></div>`
+  else if (st === 'blocked') html = `<h3>Notifications are blocked</h3><p class="hint">The ${PUSH.ios ? 'iPad' : 'browser'} says notifications are blocked. Tap <b>Try anyway</b> first. If nothing pops up, fix it here:</p>
+    <div class="err" id="ntErr"></div>
+    <div class="steps">${PUSH.ios ? `<div class="step"><span class="n">1</span><p>iPad <b>Settings</b> → <b>Notifications</b> → <b>Lounge</b> → turn on <b>Allow Notifications</b>.</p></div><div class="step"><span class="n">2</span><p>If Lounge isn’t in that list, a <b>school-managed iPad</b> may be blocking website notifications. Try a personal device.</p></div>`
       : `<div class="step"><span class="n">1</span><p>Tap the icon at the <b>left of the address bar</b> (it looks like sliders or a lock).</p></div><div class="step"><span class="n">2</span><p>Set <b>Notifications</b> to <b>Allow</b>, then reload the page.</p></div>`}</div>
-    <div class="row"><button class="btn primary" data-close>OK</button></div>`;
+    <div class="row"><button class="btn" data-close>Close</button><button class="btn primary" id="ntOn">Try anyway</button></div>`;
   else if (st === 'unsupported') html = `<h3>Not supported here</h3><p class="hint">This browser can’t do notifications. Try Chrome on a computer or Chromebook, or Safari on iPad/iPhone (added to the Home Screen).</p><div class="row"><button class="btn primary" data-close>OK</button></div>`;
   else html = `<h3>${st === 'on' ? 'Notifications are on' : 'Turn on notifications'}</h3><p class="hint">${st === 'on' ? 'This device gets pinged for DMs, groups, and @mentions, even with the chat closed.' : 'Get a popup for DMs, groups, and @mentions, even when the chat is closed. Tap the button, then tap <b>Allow</b>.'}</p>
     <p class="hint">Want a ping for <b>every</b> message? Settings → Ping sound → Every message.</p>
