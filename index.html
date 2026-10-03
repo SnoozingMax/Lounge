@@ -902,13 +902,18 @@ async function saveSub(sub){
   const { error } = await sb.rpc('save_push_sub', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_mode: soundMode() === 'all' ? 'all' : 'pings' });
   if (error) throw error;
 }
-async function enablePush(){
-  const reg = await swReady(); if (!reg) throw new Error('Notifications aren’t supported here');
-  const perm = await Notification.requestPermission();
-  if (perm !== 'granted') throw new Error(perm === 'denied' ? (PUSH.ios ? 'The iPad blocked it without asking. Check Settings → Notifications, or the school may block it.' : 'Blocked. Allow notifications in your browser settings.') : 'You need to tap Allow');
-  let sub = await reg.pushManager.getSubscription();
-  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(VAPID_PUBLIC) });
-  await saveSub(sub);
+function enablePush(){
+  // must ask the iPad right away inside the tap, with nothing awaited first, or Safari auto-denies
+  const reg = PUSH.reg;
+  if (!reg) { swReady(); return Promise.reject(new Error('Still loading. Wait a second and tap again.')); }
+  let ask;
+  try { ask = reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(VAPID_PUBLIC) }); }
+  catch (e) { return Promise.reject(e); }
+  return ask.then(sub => saveSub(sub)).catch(e => {
+    if (/denied|not allowed|permission/i.test(e?.message || '') || e?.name === 'NotAllowedError')
+      throw new Error(PUSH.ios ? 'The iPad said no without asking. A school-managed iPad may block website notifications.' : 'Blocked. Allow notifications in your browser settings.');
+    throw e;
+  });
 }
 async function disablePush(){
   const reg = await swReady(); if (!reg) return;
@@ -960,8 +965,9 @@ async function openNotifySetup(){
   const m = openModal(html);
   const on = m.el.querySelector('#ntOn'), off = m.el.querySelector('#ntOff');
   if (on) on.onclick = async () => {
+    const asking = enablePush();
     on.disabled = true; on.textContent = 'Turning on…';
-    try { await enablePush(); m.close(); toast('Notifications on'); refreshPushBar(); }
+    try { await asking; m.close(); toast('Notifications on'); refreshPushBar(); }
     catch (e) { m.el.querySelector('#ntErr').textContent = friendly(e); on.disabled = false; on.textContent = 'Turn on'; }
   };
   if (off) off.onclick = async () => { await disablePush(); m.close(); toast('Notifications off for this device'); refreshPushBar(); };
