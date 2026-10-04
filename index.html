@@ -248,6 +248,7 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
 .mem{display:flex;align-items:center;gap:10px;width:100%;padding:6px 8px;border-radius:9px;text-align:left}
 .mem:hover{background:var(--sunk)}
 .mem.off{opacity:.5}
+.mem .seen{display:block;font-size:11.5px;font-weight:400;color:var(--muted)}
 .mem .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:550;font-size:14px}
 .mem .tag{font-size:9px;padding:2px 5px}
 
@@ -520,7 +521,7 @@ const genKey = () => { const a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', b = crypto.
 const S = {
   me: null, profiles: new Map(), nameIdx: new Map(),
   channels: new Map(), members: new Map(),
-  friends: new Map(), waiting: new Map(),
+  friends: new Map(), waiting: new Map(), seen: new Map(),
   current: null, msgs: new Map(), byId: new Map(), reacts: new Map(), hasMore: new Map(),
   unread: new Map(), lastAt: new Map(), online: new Set(), typing: new Map(),
   pending: [], reply: null, editing: null, file: null,
@@ -724,6 +725,9 @@ function showLogin(){
 
 /* update log: newest first. Add a new entry at the top for every update. */
 const UPDATES = [
+  { id: '2026-10-04a', date: 'Oct 4', items: [
+    ['🕓', 'See when people were last online in the member list, their profile, and DMs.']
+  ]},
   { id: '2026-10-03a', date: 'Oct 3', items: [
     ['🔢', 'The tab number and ping keep working when the chat sits in the background for a long time.']
   ]},
@@ -797,7 +801,6 @@ const GUIDE = {
   pings: [
     ['📣', 'Ping someone', 'Type <code>@</code> and pick a name from the list, like <code>@max</code>. Their message gets highlighted and they hear a ping.'],
     ['🤫', 'Silent ping', 'Start your message with <code>@silent</code>, like <code>@silent @max look</code>. It still highlights for them, just no sound.'],
-    ['📲', 'Notifications', 'Get pinged even when the chat is closed. Tap <b>Set up</b> on the orange bar, or Settings \u2192 Notifications. On iPad you add Lounge to your Home Screen first, and it shows you how.'],
     ['🔔', 'Sound', 'Pick <b>Every message</b>, <b>DMs + @mentions</b>, or <b>Off</b> in Settings. Tap anywhere in the chat once so sound can play. On iPad, no sound if Silent Mode is on or Safari is in the background.'],
     ['⌨️', 'Text tricks', '<code>**bold**</code>  <code>*italic*</code>  <code>~~strike~~</code>  <code>`code`</code>  and <code>&gt; quote</code>.']
   ],
@@ -928,11 +931,7 @@ async function syncPush(){
     await saveSub(await PUSH.reg.pushManager.getSubscription());
   } catch {}
 }
-async function refreshPushBar(){
-  const st = await pushState();
-  const hide = st === 'on' || st === 'unsupported' || LS.get('pushBarHidden', false);
-  $('pushBar').classList.toggle('hidden', hide);
-}
+async function refreshPushBar(){ $('pushBar').classList.add('hidden'); }
 const shareIc = '<span class="ios-ic">' + sv('<path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-8"/>', 16) + '</span>';
 const addIc = '<span class="ios-ic" style="color:var(--ink)">' + sv('<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/>', 16) + '</span>';
 async function openNotifySetup(){
@@ -988,7 +987,8 @@ async function start(){
   if (!S.me) { await sb.auth.signOut(); show('auth'); authErr('Account not found.'); return; }
   if (S.me.approved === false) { showWaiting(); return; }
   await loadChannels();
-  await Promise.all([refreshState(), loadFriends()]);
+  await Promise.all([refreshState(), loadFriends(), loadSeen()]);
+  touchSeen();
   show('app');
   renderMe(); applyRestrictions();
   subscribe();
@@ -1105,7 +1105,12 @@ function subscribe(){
       else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') S.rtDown = true;
     });
   S.live = sb.channel('live', { config: { presence: { key: S.me.id }, broadcast: { self: false } } })
-    .on('presence', { event: 'sync' }, () => { S.online = new Set(Object.keys(S.live.presenceState())); renderPresence(); })
+    .on('presence', { event: 'sync' }, () => {
+      const now = new Set(Object.keys(S.live.presenceState())), t = new Date().toISOString();
+      for (const id of S.online) if (!now.has(id)) S.seen.set(id, t);   // just went offline
+      for (const id of now) S.seen.set(id, t);
+      S.online = now; renderPresence();
+    })
     .on('broadcast', { event: 'typing' }, ({ payload }) => onTyping(payload))
     .subscribe(async st => { if (st === 'SUBSCRIBED') await S.live.track({ at: Date.now() }); });
 }
@@ -1113,7 +1118,7 @@ function subscribe(){
 async function catchUp(){
   if (!S.me) return;
   try {
-    await Promise.all([loadProfiles(), loadChannels(), loadFriends()]);
+    await Promise.all([loadProfiles(), loadChannels(), loadFriends(), loadSeen()]);
     S.me = S.profiles.get(S.me.id) || S.me;
     for (const k of [...S.msgs.keys()]) if (k !== S.current) S.msgs.delete(k);
     if (S.current && S.channels.has(S.current)) { await loadMessages(S.current); renderMessages(S.nearBottom); }
@@ -1276,6 +1281,31 @@ function onProfile({ eventType, new: n, old: o }){
   if (eventType === 'UPDATE' && S.current) renderMessages(false);
 }
 
+/* ---------- last online ---------- */
+async function loadSeen(){
+  const { data, error } = await sb.from('last_seen').select('user_id,at');
+  if (error || !data) return;
+  for (const r of data) if (!S.online.has(r.user_id)) S.seen.set(r.user_id, r.at);
+}
+function touchSeen(){ if (S.me && sb) sb.rpc('touch_seen').then(() => {}, () => {}); }
+function agoShort(t){
+  if (!t) return '';
+  const m = Math.max(0, Math.round((Date.now() - Date.parse(t)) / 60000));
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60); if (h < 24) return `${h}h ago`;
+  const d = Math.round(h / 24); return d < 30 ? `${d}d ago` : 'a while ago';
+}
+function lastOnline(id){
+  if (S.online.has(id)) return 'Online';
+  const t = S.seen.get(id);
+  return t ? `Last online ${agoShort(t)}` : 'Offline';
+}
+setInterval(() => { if (S.me && !document.hidden) { touchSeen(); renderMembers(); renderHeader(); } }, 60000);
+setInterval(() => { if (S.me && !document.hidden) loadSeen().then(() => renderMembers()); }, 180000);
+document.addEventListener('visibilitychange', () => { if (S.me) touchSeen(); });
+addEventListener('pagehide', () => touchSeen());
+
 /* ---------- typing ---------- */
 function sendTyping(){
   const now = Date.now();
@@ -1429,7 +1459,7 @@ function renderHeader(){
   let name, topic = '';
   if (c.kind === 'public') { name = `<span class="hash">#</span><span>${esc(c.name)}</span>`; topic = esc(c.topic || ''); }
   else if (c.kind === 'group') { name = `<span class="gicon">${I.group}</span><span>${esc(c.name)}</span>`; topic = `${(S.members.get(c.id) || new Set()).size} members`; }
-  else { const o = dmOther(c); name = `${avatarHTML(o, 26, true)}<span>${esc(dn(o) || 'Unknown')}</span>`; topic = o && S.online.has(o.id) ? (o.status || 'Online') : 'Offline'; }
+  else { const o = dmOther(c); name = `${avatarHTML(o, 26, true)}<span>${esc(dn(o) || 'Unknown')}</span>`; topic = o ? (S.online.has(o.id) ? (o.status || 'Online') : lastOnline(o.id)) : ''; }
   $('chName').innerHTML = name; $('chTopic').innerHTML = topic;
   $('chSettingsBtn').classList.toggle('hidden', !(c.kind === 'group' || (c.kind === 'public' && S.me.is_admin)));
   $('input').placeholder = c.kind === 'public' ? `Message #${c.name}` : c.kind === 'group' ? `Message ${c.name}` : `Message @${dmOther(c)?.username || ''}`;
@@ -1445,7 +1475,7 @@ function renderMembers(){
   const byName = (a, b) => S.profiles.get(a).username.localeCompare(S.profiles.get(b).username, undefined, { sensitivity: 'base' });
   const on = ids.filter(id => S.online.has(id)).sort(byName), off = ids.filter(id => !S.online.has(id)).sort(byName);
   const row = (id, isOn) => { const p = S.profiles.get(id);
-    return `<button class="mem ${isOn ? '' : 'off'}" data-user="${id}">${avatarHTML(p, 30, true)}<span class="nm">${esc(dn(p))}</span>${p.is_admin ? '<span class="tag">admin</span>' : ''}${p.banned && S.me.is_admin ? '<span class="tag danger">ban</span>' : isMuted(p) && S.me.is_admin ? '<span class="tag">muted</span>' : ''}</button>`; };
+    return `<button class="mem ${isOn ? '' : 'off'}" data-user="${id}">${avatarHTML(p, 30, true)}<span class="nm">${esc(dn(p))}${!isOn && S.seen.get(id) ? `<span class="seen">${agoShort(S.seen.get(id))}</span>` : ''}</span>${p.is_admin ? '<span class="tag">admin</span>' : ''}${p.banned && S.me.is_admin ? '<span class="tag danger">ban</span>' : isMuted(p) && S.me.is_admin ? '<span class="tag">muted</span>' : ''}</button>`; };
   $('membersInner').innerHTML =
     `<div class="mem-h" style="margin-top:6px">Online · ${on.length}</div>${on.map(id => row(id, true)).join('')}` +
     (off.length ? `<div class="mem-h">Offline · ${off.length}</div>${off.map(id => row(id, false)).join('')}` : '');
@@ -2156,7 +2186,7 @@ function openProfile(uid){
   const muted = isMuted(u);
   const html = `<div class="pc-top" style="--c:${safeColor(u.color)}"></div><div class="pc-body">${avatarHTML(u, 72, true)}
     <div class="pc-name">${esc(dn(u))}${u.is_admin ? '<span class="tag">admin</span>' : ''}${u.banned ? '<span class="tag danger">banned</span>' : ''}${muted && (me || S.me.is_admin) ? '<span class="tag">muted</span>' : ''}${S.friends.get(uid) === 'friends' ? '<span class="tag ok">friend</span>' : ''}</div>
-    <div class="pc-sub">@${esc(u.username)} · ${S.online.has(uid) ? 'Online' : 'Offline'} · Joined ${new Date(u.created_at).toLocaleDateString([], { month: 'short', year: 'numeric' })}</div>
+    <div class="pc-sub">@${esc(u.username)} · ${lastOnline(uid)} · Joined ${new Date(u.created_at).toLocaleDateString([], { month: 'short', year: 'numeric' })}</div>
     ${u.status ? `<div class="pc-status">${esc(u.status)}</div>` : ''}
     ${u.bio ? `<div class="pc-bio">${esc(u.bio)}</div>` : ''}
     <div class="pc-actions">${me ? '<button class="btn" data-a="settings">Edit profile</button>' : `<button class="btn primary" data-a="dm">Message</button>${friendBtnHTML(uid)}`}
@@ -2411,7 +2441,6 @@ function openEditProfile(){
 
 function openSettings(){
   const m = openModal(`<h3>Settings</h3><p class="hint">Notifications, sound, and your account.</p>
-    <div class="field"><span>Notifications</span><div class="notif-state"><span class="dotc" id="stNDot"></span><span id="stNText" style="flex:1;font-size:14px;color:var(--ink-2)">Checking…</span><button class="btn sm" type="button" id="stNBtn">Set up</button></div></div>
     <div class="field"><span>Ping sound</span><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div class="seg" id="stSound">${[['all', 'Every message'], ['pings', 'DMs + @mentions'], ['off', 'Off']].map(([v, l]) => `<button type="button" data-v="${v}" class="${soundMode() === v ? 'on' : ''}">${l}</button>`).join('')}</div><button class="btn sm" type="button" id="stTest">Test</button></div></div>
     <div class="divider"></div>
     <label class="field"><span>Change password</span><span class="pw"><input class="inp" id="stPass" type="password" placeholder="New password" autocomplete="new-password"><button class="eye" type="button" data-eye="stPass">${I.eye}</button></span></label>
@@ -2423,12 +2452,6 @@ function openSettings(){
   const q = x => m.el.querySelector(x), err = t => { q('#stErr').textContent = t; };
   q('#stSound').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; LS.set('sound', b.dataset.v); syncPush(); q('#stSound').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
   q('#stTest').onclick = () => { unlockAudio(); ping(true); };
-  pushState().then(st => {
-    const txt = { on: 'On for this device', off: 'Off', blocked: 'Blocked by the browser', install: 'Add to Home Screen first', frame: 'Open Lounge directly to turn on', unsupported: 'Not supported in this browser' }[st];
-    q('#stNText').textContent = txt; q('#stNDot').classList.toggle('on', st === 'on');
-    q('#stNBtn').textContent = st === 'on' ? 'Manage' : 'Set up';
-  });
-  q('#stNBtn').onclick = () => { m.close(); openNotifySetup(); };
   q('#stGuide').onclick = () => { m.close(); openGuide(false); };
   q('#stOut').onclick = async () => { m.close(); try { await disablePush(); } catch {} await sb.auth.signOut(); };
   q('#stPassGo').onclick = async () => {
