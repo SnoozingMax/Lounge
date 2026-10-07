@@ -337,6 +337,8 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
 .wv-in h1{font-size:26px;font-weight:600;letter-spacing:-.03em}
 .wv-in p{color:#8b8982;margin-top:10px;font-size:15px}
 .wv-in .wv-name b{color:#eeede9}
+.wv-reason{margin:18px auto 0;max-width:420px;padding:14px 16px;border:1px solid #2a2a2f;border-radius:12px;color:#eeede9!important;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere}
+.wv-reason b{color:#8b8982;font-weight:500;display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px}
 .wv-out{margin-top:36px;font-size:13px;color:#5d5b56;text-decoration:underline;text-underline-offset:3px}
 .wv-out:hover{color:#8b8982}
 .ch.locked{opacity:.45;cursor:default}
@@ -386,8 +388,9 @@ code{font-family:'Geist Mono',monospace;font-size:.88em;background:var(--sunk);p
 
 <div class="wait-void hidden" id="wait">
   <div class="wv-in">
-    <h1>You’re in the waiting room</h1>
-    <p>An admin needs to let you in. Keep this page open.</p>
+    <h1 id="waitTitle">You’re in the waiting room</h1>
+    <p id="waitMsg">An admin needs to let you in. Keep this page open.</p>
+    <p class="wv-reason hidden" id="waitReason"></p>
     <p class="wv-name">Your username: <b id="waitName"></b></p>
     <button class="wv-out" id="waitOut" type="button">Log out</button>
   </div>
@@ -725,6 +728,9 @@ function showLogin(){
 
 /* update log: newest first. Add a new entry at the top for every update. */
 const UPDATES = [
+  { id: '2026-10-06a', date: 'Oct 6', items: [
+    ['🚫', 'Admins can give a reason when denying someone from the waiting room. They see it on their screen.']
+  ]},
   { id: '2026-10-04a', date: 'Oct 4', items: [
     ['🕓', 'See when people were last online in the member list, their profile, and DMs.']
   ]},
@@ -843,10 +849,19 @@ $('helpBtn').innerHTML = sv('<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.4a
 $('helpBtn').onclick = () => openGuide(false);
 
 /* ---------- waiting room ---------- */
+const pendingCount = () => [...S.waiting.values()].filter(p => !p.denied_reason).length;
 let waitTimer = null, waitChan = null;
 function showWaiting(){
   show('wait');
   $('waitName').textContent = '@' + S.me.username;
+  const showDenied = r => {
+    const d = !!r;
+    $('waitTitle').textContent = d ? 'You weren\u2019t let in' : 'You\u2019re in the waiting room';
+    $('waitMsg').textContent = d ? 'An admin denied this account.' : 'An admin needs to let you in. Keep this page open.';
+    $('waitReason').classList.toggle('hidden', !d);
+    if (d) $('waitReason').innerHTML = `<b>Reason</b>${esc(r)}`;
+  };
+  showDenied(S.me.denied_reason);
   $('waitOut').onclick = async () => { stopWaiting(); await sb.auth.signOut(); show('auth'); };
   let shown = false;
   const accepted = () => {
@@ -859,14 +874,14 @@ function showWaiting(){
     m.onclose = () => location.reload();
   };
   const check = async () => {
-    const { data, error } = await sb.from('profiles').select('approved').eq('id', S.me.id).maybeSingle();
+    const { data, error } = await sb.from('profiles').select('*').eq('id', S.me.id).maybeSingle();
     if (error) return;
     if (!data) { stopWaiting(); await sb.auth.signOut(); show('auth'); authErr('An admin didn’t let this account in.'); return; }
-    if (data.approved) accepted();
+    if (data.approved) accepted(); else showDenied(data.denied_reason);
   };
   stopWaiting();
   waitTimer = setInterval(check, 15000);
-  waitChan = sb.channel('wait').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${S.me.id}` }, ({ new: n }) => { if (n.approved) accepted(); }).subscribe();
+  waitChan = sb.channel('wait').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${S.me.id}` }, ({ new: n }) => { if (n.approved) accepted(); else showDenied(n.denied_reason); }).subscribe();
   waitCheck = check;
 }
 let waitCheck = null;
@@ -1267,7 +1282,7 @@ function onProfile({ eventType, new: n, old: o }){
   if (n.approved === false && n.id !== S.me?.id) {
     const isNew = !S.waiting.has(n.id);
     S.waiting.set(n.id, n); S.profiles.delete(n.id);
-    if (isNew && S.me?.is_admin) { toast(`${n.username} is in the waiting room`); ping(); }
+    if (isNew && !n.denied_reason && S.me?.is_admin) { toast(`${n.username} is in the waiting room`); ping(); }
     renderMe(); if (adminModal) adminModal.draw();
     return;
   }
@@ -1388,7 +1403,7 @@ function chLabel(c){ return c.kind === 'dm' ? (dn(dmOther(c)) || 'Unknown') : (c
 
 function renderMe(){
   if (!S.me) return;
-  $('meBar').innerHTML = `${avatarHTML(S.me, 34, true)}<div class="who" id="meWho"><div class="nm">${esc(dn(S.me))}</div><div class="st">${S.me.banned ? 'Banned' : isMuted() ? 'Muted' : S.me.status ? esc(S.me.status) : S.me.is_admin ? 'Admin' : 'Online'}</div></div>${S.me.is_admin ? `<button class="icon-btn fr-btn" id="adminBtn" title="Admin panel">${I.shield}${S.waiting.size ? `<span class="badge">${S.waiting.size}</span>` : ''}</button>` : ''}<button class="icon-btn" id="profileBtn" title="Edit profile">${I.person}</button><button class="icon-btn" id="settingsBtn" title="Settings">${I.gearCog}</button>`;
+  $('meBar').innerHTML = `${avatarHTML(S.me, 34, true)}<div class="who" id="meWho"><div class="nm">${esc(dn(S.me))}</div><div class="st">${S.me.banned ? 'Banned' : isMuted() ? 'Muted' : S.me.status ? esc(S.me.status) : S.me.is_admin ? 'Admin' : 'Online'}</div></div>${S.me.is_admin ? `<button class="icon-btn fr-btn" id="adminBtn" title="Admin panel">${I.shield}${pendingCount() ? `<span class="badge">${pendingCount()}</span>` : ''}</button>` : ''}<button class="icon-btn" id="profileBtn" title="Edit profile">${I.person}</button><button class="icon-btn" id="settingsBtn" title="Settings">${I.gearCog}</button>`;
   $('profileBtn').onclick = openEditProfile;
   $('settingsBtn').onclick = openSettings;
   if (S.me.is_admin) $('adminBtn').onclick = openAdmin;
@@ -2304,6 +2319,17 @@ function openFriends(startTab){
 $('friendsBtn').onclick = () => openFriends();
 renderFriendBadge();
 
+function denyBox(name){
+  return new Promise(res => {
+    const m = openModal(`<h3>Deny ${esc(name)}?</h3><p class="hint">They’ll see this reason on their screen. Leave it blank to just say no.</p>
+      <label class="field"><span>Reason</span><textarea class="inp" id="dnR" rows="3" maxlength="200" placeholder="e.g. Not from our grade"></textarea></label>
+      <div class="row"><button class="btn" data-close>Cancel</button><button class="btn danger fill" id="dnGo">Deny</button></div>`);
+    let v = null;
+    m.onclose = () => res(v);
+    m.el.querySelector('#dnGo').onclick = () => { v = m.el.querySelector('#dnR').value.trim(); m.close(); };
+  });
+}
+
 /* admin panel */
 let adminModal = null;
 function openAdmin(){
@@ -2314,17 +2340,19 @@ function openAdmin(){
     <div class="divider"></div>
     <p class="hint" style="margin:0;line-height:1.8">Chat commands: <code>/mute @user 10</code> <code>/unmute @user</code> <code>/ban @user</code> <code>/unban @user</code> <code>/admin</code><br>Start a message with <code>@silent</code> to ping without a sound.</p>`, 'admin');
   const body = m.el.querySelector('#adBody');
-  let tab = S.waiting.size ? 'waiting' : 'users', q = '';
+  let tab = pendingCount() ? 'waiting' : 'users', q = '';
   const draw = async () => {
-    m.el.querySelector('#adTabs').innerHTML = [['waiting', `Waiting${S.waiting.size ? ' · ' + S.waiting.size : ''}`], ['users', 'Users'], ['channels', 'Channels'], ['stats', 'Stats']]
+    m.el.querySelector('#adTabs').innerHTML = [['waiting', `Waiting${pendingCount() ? ' · ' + pendingCount() : ''}`], ['users', 'Users'], ['channels', 'Channels'], ['stats', 'Stats']]
       .map(([k, l]) => `<button type="button" data-t="${k}" class="${k === tab ? 'on' : ''}">${l}</button>`).join('');
     if (tab === 'waiting') {
-      const list = [...S.waiting.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
+      const all = [...S.waiting.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
+      const list = all.filter(p => !p.denied_reason), denied = all.filter(p => p.denied_reason);
       const { data: cfg } = await sb.from('app_settings').select('require_approval').eq('id', 1).maybeSingle();
       const on = cfg ? cfg.require_approval : true;
       body.innerHTML = `<label class="toggle" style="margin:0 0 12px"><input type="checkbox" id="adReq" ${on ? 'checked' : ''}><span>New accounts have to wait for approval</span></label>
         ${list.map(p => `<div class="urow" data-wait="${p.id}">${avatarHTML(p, 30)}<div class="nm">${esc(p.username)}<span class="sub">Signed up ${fmtStamp(p.created_at)}</span></div><div class="acts"><button class="btn sm primary" data-a="approve">Let in</button><button class="btn sm danger" data-a="deny">Deny</button></div></div>`).join('')
-          || `<div class="pick-empty">${on ? 'No one waiting.' : 'Waiting room is off. Anyone who signs up gets in right away.'}</div>`}`;
+          || `<div class="pick-empty">${on ? 'No one waiting.' : 'Waiting room is off. Anyone who signs up gets in right away.'}</div>`}
+        ${denied.length ? `<div class="mem-h">Denied \u00b7 ${denied.length}</div>${denied.map(p => `<div class="urow" data-wait="${p.id}">${avatarHTML(p, 30)}<div class="nm">${esc(p.username)}<span class="sub">Reason: ${esc(p.denied_reason)}</span></div><div class="acts"><button class="btn sm" data-a="approve">Let in</button><button class="btn sm danger" data-a="remove">Delete account</button></div></div>`).join('')}` : ''}`;
       body.querySelector('#adReq').onchange = async e => {
         const { error } = await sb.rpc('admin_set_approval', { p_on: e.target.checked });
         if (error) { toast(friendly(error)); e.target.checked = !e.target.checked; return; }
@@ -2360,12 +2388,20 @@ function openAdmin(){
     const b = e.target.closest('[data-a]'); if (!b) return;
     const row = b.closest('.urow');
     if (row.dataset.wait) {
-      const id = row.dataset.wait, w = S.waiting.get(id), ok = b.dataset.a === 'approve';
-      if (!ok && !await confirmBox(`Deny ${w ? w.username : 'them'}?`, 'Their account gets deleted. They can sign up again.', 'Deny')) return;
-      const { error } = await sb.rpc('admin_approve', { p_user: id, p_ok: ok });
+      const id = row.dataset.wait, w = S.waiting.get(id), a = b.dataset.a, name = w ? w.username : 'them';
+      if (a === 'deny') {
+        const reason = await denyBox(name);
+        if (reason === null) return;
+        const { error } = await sb.rpc('admin_deny', { p_user: id, p_reason: reason });
+        if (error) return toast(/admin_deny/.test(error.message) ? 'Run the deny-reason SQL in Supabase first' : friendly(error));
+        if (w) S.waiting.set(id, { ...w, denied_reason: reason || 'No reason given' });
+        toast(`Denied ${name}`); renderMe(); draw(); return;
+      }
+      if (a === 'remove' && !await confirmBox(`Delete ${name}\u2019s account?`, 'The username frees up and they can sign up again.', 'Delete')) return;
+      const { error } = await sb.rpc('admin_approve', { p_user: id, p_ok: a === 'approve' });
       if (error) return toast(friendly(error));
-      if (ok && w) { S.profiles.set(id, { ...w, approved: true }); rebuildNames(); toast(`${w.username} is in`); }
-      else toast('Denied');
+      if (a === 'approve' && w) { S.profiles.set(id, { ...w, approved: true, denied_reason: null }); rebuildNames(); toast(`${name} is in`); }
+      else toast('Account deleted');
       S.waiting.delete(id); renderMe(); renderMembers(); draw(); return;
     }
     if (row.dataset.id) { await adminAction(S.profiles.get(row.dataset.id), b.dataset.a); draw(); return; }
