@@ -358,6 +358,8 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
 .exe-slash{position:absolute;left:50%;top:50%;width:150%;height:5px;margin:-2.5px 0 0 -75%;background:#fff;border-radius:3px;box-shadow:0 0 14px #fff,0 0 30px #ff5b2e;transform:rotate(-45deg) scaleX(0);transform-origin:100% 50%;animation:exeSlash .5s .62s ease-out forwards}
 .exe-text{color:#eeede9;font-size:18px;opacity:0;animation:exeUp .4s 1.3s ease-out forwards;position:relative}
 .exe-text b{color:#fff}
+.exe-text{text-align:center}
+.exe-away{display:block;margin-top:6px;font-size:13px;color:#8b8982}
 .exe-stamp{position:absolute;top:50%;left:50%;font-weight:800;font-size:min(64px,14vw);letter-spacing:.06em;color:#e5484d;border:6px solid #e5484d;border-radius:12px;padding:2px 18px;opacity:0;transform:translate(-50%,-50%) rotate(-12deg) scale(2.4);animation:exeStamp .3s 1.65s cubic-bezier(.3,1.6,.5,1) forwards;text-shadow:0 0 20px rgba(229,72,77,.5)}
 @keyframes exeIn{from{transform:scale(.6);opacity:0}}
 @keyframes exeSlash{0%{transform:rotate(-45deg) scaleX(0);opacity:1}70%{transform:rotate(-45deg) scaleX(1);opacity:1}100%{transform:rotate(-45deg) scaleX(1);opacity:0}}
@@ -1043,6 +1045,7 @@ async function start(){
   if (newbie) { LS.set('seenUpdate:' + S.me.id, UPDATES[0].id); openGuide(true); }
   else showUpdates();
   if (S.me.is_admin) cleanOldImages();
+  setTimeout(loadExecutions, 600);
 }
 
 function teardown(){
@@ -1141,6 +1144,7 @@ function subscribe(){
     .on('postgres_changes', { event: '*', schema: 'public', table: 'channel_members' }, onMember)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, onProfile)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, onFriendship)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'executions' }, ({ new: n }) => onExecution(n, false))
     .subscribe(st => {
       if (st === 'SUBSCRIBED') { if (S.rtDown) { S.rtDown = false; catchUp(); } }
       else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') S.rtDown = true;
@@ -1153,7 +1157,6 @@ function subscribe(){
       S.online = now; renderPresence();
     })
     .on('broadcast', { event: 'typing' }, ({ payload }) => onTyping(payload))
-    .on('broadcast', { event: 'execute' }, ({ payload }) => { const u = payload && S.profiles.get(payload.u); if (u) playExecute(u); })
     .subscribe(async st => { if (st === 'SUBSCRIBED') await S.live.track({ at: Date.now() }); });
 }
 
@@ -1966,10 +1969,10 @@ async function runCommand(text){
   if (c === 'execute') {
     if (u.id === S.me.id) { toast('You can\u2019t execute yourself'); return true; }
     if (u.banned) { toast(`${u.username} is already banned`); return true; }
-    r = await sb.rpc('admin_set', { p_user: u.id, p_field: 'banned', p_value: true });
-    if (r.error) { toast(friendly(r.error)); return true; }
+    r = await sb.rpc('admin_execute', { p_user: u.id });
+    if (r.error) { toast(/admin_execute/.test(r.error.message) ? 'Run the /execute SQL in Supabase first' : friendly(r.error)); return true; }
     S.profiles.set(u.id, { ...u, banned: true });
-    try { S.live && S.live.send({ type: 'broadcast', event: 'execute', payload: { u: u.id } }); } catch {}
+    markExecSeen(r.data);
     playExecute(u);
     return true;
   }
@@ -1989,6 +1992,26 @@ async function runCommand(text){
   return true;
 }
 
+/* /execute: remembered per account so offline people see it next time */
+const execKey = () => 'execSeen:' + (S.me ? S.me.id : '');
+function markExecSeen(id){ if (id && id > LS.get(execKey(), 0)) LS.set(execKey(), id); }
+function onExecution(n, away){
+  if (!n || !S.me || n.id <= LS.get(execKey(), 0)) return;
+  markExecSeen(n.id);
+  const u = S.profiles.get(n.user_id) || (n.user_id === S.me.id ? S.me : null);
+  if (!u) return;
+  if (u.id !== S.me.id) S.profiles.set(u.id, { ...u, banned: true });
+  playExecute(u, away ? (n.user_id === S.me.id ? 'This happened while you were away. You’re banned.' : `while you were away · ${agoShort(n.at)}`) : (n.user_id === S.me.id ? 'You’re banned.' : ''));
+}
+async function loadExecutions(){
+  const seen = LS.get(execKey(), 0);
+  let q = sb.from('executions').select('*').gt('id', seen).order('id').limit(10);
+  if (!seen) q = q.gt('at', new Date(Date.now() - 2 * 86400000).toISOString());
+  const { data, error } = await q;
+  if (error || !data) return;
+  for (const n of data) onExecution(n, true);
+}
+
 /* /execute animation */
 function slashSound(){
   if (soundMode() === 'off') return;
@@ -2005,7 +2028,11 @@ function slashSound(){
     o.connect(og).connect(actx.destination); o.start(t + 0.9); o.stop(t + 1.35);
   } catch {}
 }
-function playExecute(u){
+const execQueue = [];
+let execPlaying = false;
+function playExecute(u, away){
+  if (execPlaying) { execQueue.push([u, away]); return; }
+  execPlaying = true;
   document.querySelectorAll('.exe').forEach(e => e.remove());
   const pic = u.avatar_url && u.avatar_url.startsWith(AV_PREFIX)
     ? `<img src="${esc(u.avatar_url)}" alt="">`
@@ -2013,11 +2040,16 @@ function playExecute(u){
   const ov = document.createElement('div');
   ov.className = 'exe';
   ov.innerHTML = `<div class="exe-stage"><div class="exe-half a">${pic}</div><div class="exe-half b">${pic}</div><div class="exe-slash"></div></div>
-    <div class="exe-text"><b>${esc(dn(u))}</b> has been executed</div><div class="exe-stamp">BANNED</div>`;
+    <div class="exe-text"><b>${esc(dn(u))}</b> has been executed${away ? `<span class="exe-away">${esc(away)}</span>` : ''}</div>`;
   document.body.appendChild(ov);
   setTimeout(slashSound, 650);
-  const done = () => { ov.classList.add('out'); setTimeout(() => ov.remove(), 400); };
-  ov.onclick = done; setTimeout(done, 4200);
+  let closed = false;
+  const done = () => {
+    if (closed) return; closed = true;
+    ov.classList.add('out');
+    setTimeout(() => { ov.remove(); execPlaying = false; const nx = execQueue.shift(); if (nx) playExecute(...nx); }, 400);
+  };
+  ov.onclick = done; setTimeout(done, 3600);
   renderMembers();
 }
 
