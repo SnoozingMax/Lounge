@@ -181,7 +181,6 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
 .mn{background:var(--accent-soft);color:var(--accent-2);font-weight:600;border-radius:5px;padding:0 3px;cursor:pointer}
 [data-theme="dark"] .mn{color:#ff9a7a}
 .edited{font-size:11px;color:var(--muted)}
-.msg.big .text{font-size:26px;line-height:1.25;font-weight:550;letter-spacing:-.01em}
 .mn.mn-all{cursor:default}
 .av svg{width:60%;height:60%}
 .silent{font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:0 5px;margin-left:4px;vertical-align:1px}
@@ -757,8 +756,7 @@ function showLogin(){
 /* update log: newest first. Add a new entry at the top for every update. */
 const UPDATES = [
   { id: '2026-10-13a', date: 'Oct 13', items: [
-    ['⌨️', 'Type <code>/</code> to see the commands you can use.'],
-    ['🔠', '<code>/big</code> makes your messages bigger. <code>/unbig</code> puts them back.']
+    ['⌨️', 'Type <code>/</code> to see the commands you can use.']
   ]},
   { id: '2026-10-08a', date: 'Oct 8', items: [
     ['💀', 'Type <code>:</code> and a word, like <code>:skull</code>, to pick an emoji. Typing the full <code>:skull:</code> works too.']
@@ -843,7 +841,6 @@ const GUIDE = {
     ['📣', 'Ping someone', 'Type <code>@</code> and pick a name from the list, like <code>@max</code>. Their message gets highlighted and they hear a ping.'],
     ['🤫', 'Silent ping', 'Start your message with <code>@silent</code>, like <code>@silent @max look</code>. It still highlights for them, just no sound.'],
     ['🔔', 'Sound', 'Pick <b>Every message</b>, <b>DMs + @mentions</b>, or <b>Off</b> in Settings. Tap anywhere in the chat once so sound can play. On iPad, no sound if Silent Mode is on or Safari is in the background.'],
-    ['🔠', '/big', 'Type <code>/big</code> to make your messages bigger for everyone. <code>/unbig</code> puts them back.'],
     ['😀', 'Emoji shortcuts', 'Type <code>:</code> and a word, like <code>:sob</code>, then pick from the list. Or type the whole thing, like <code>:fire:</code>.'],
     ['⌨️', 'Text tricks', '<code>**bold**</code>  <code>*italic*</code>  <code>~~strike~~</code>  <code>`code`</code>  and <code>&gt; quote</code>.']
   ],
@@ -1597,7 +1594,7 @@ function msgEl(m, prev){
   const u = S.profiles.get(m.user_id) || { id: '', username: 'unknown', color: '#8b8982' };
   const compact = isCompact(m, prev);
   const el = document.createElement('div');
-  el.className = 'msg' + (u.big_text ? ' big' : '') + (compact ? ' compact' : '') + (m.pending ? ' pending' : '') + (!m.pending && m.user_id !== S.me.id && mentionsMe(m.content, m.user_id) ? ' mention' : '');
+  el.className = 'msg' + (compact ? ' compact' : '') + (m.pending ? ' pending' : '') + (!m.pending && m.user_id !== S.me.id && mentionsMe(m.content, m.user_id) ? ' mention' : '');
   el.dataset.id = m.id;
   let h = '';
   if (m.reply_to) {
@@ -1968,21 +1965,8 @@ async function runCommand(text){
   const [cmd, ...rest] = text.slice(1).trim().split(/\s+/);
   const c = (cmd || '').toLowerCase();
   if (c === 'admin') { openAdmin(); return true; }
-  if (c === 'help') { toast(S.me.is_admin ? '/big · /unbig · /execute @user · /mute @user minutes · /unmute @user · /ban @user · /unban @user · /admin' : '/big makes your messages bigger · /unbig undoes it'); return true; }
+  if (c === 'help') { toast(S.me.is_admin ? '/execute @user · /mute @user minutes · /unmute @user · /ban @user · /unban @user · /admin' : 'Commands are for admins'); return true; }
   if (c === 'silent') return false;
-  if (c === 'big' || c === 'unbig') {
-    const nm = (rest[0] || '').replace(/^@/, '').toLowerCase();
-    const who = nm ? S.nameIdx.get(nm) : S.me;
-    if (!who) { toast(`No user @${nm}`); return true; }
-    if (who.id !== S.me.id && !S.me.is_admin) { toast('Only admins can do that to someone else'); return true; }
-    const on = c === 'big';
-    const r = await sb.rpc('set_big', { p_user: who.id, p_on: on });
-    if (r.error) { toast(/set_big/.test(r.error.message) ? 'Run the /big SQL in Supabase first' : friendly(r.error)); return true; }
-    const upd = { ...who, big_text: on }; S.profiles.set(who.id, upd); if (who.id === S.me.id) S.me = upd;
-    renderMessages(false);
-    toast(who.id === S.me.id ? (on ? 'Your messages are big now. /unbig to undo' : 'Back to normal') : `${who.username} is ${on ? 'big' : 'back to normal'}`);
-    return true;
-  }
   if (!['mute', 'unmute', 'ban', 'unban', 'execute'].includes(c)) { toast(`Unknown command /${c}. Try /help`); return true; }
   if (!S.me.is_admin) { toast('Admins only'); return true; }
   const name = (rest[0] || '').replace(/^@/, '').toLowerCase();
@@ -2089,8 +2073,6 @@ const COMMANDS = [
   { c: 'ban', a: '@user', d: 'Ban someone (no animation)', admin: true },
   { c: 'unban', a: '@user', d: 'Undo a ban', admin: true },
   { c: 'admin', a: '', d: 'Open the admin panel', admin: true },
-  { c: 'big', a: '', d: 'Make your messages bigger', adminArg: true },
-  { c: 'unbig', a: '', d: 'Put your messages back to normal', adminArg: true },
   { c: 'help', a: '', d: 'Show the command list' }
 ];
 function searchEmoji(q){
