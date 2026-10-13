@@ -494,7 +494,7 @@ code{font-family:'Geist Mono',monospace;font-size:.88em;background:var(--sunk);p
 const SUPABASE_URL = 'https://nomtlkkplbtnqaxezzoy.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_ZN86bbuHIbzivhSalQMc0w_Ed0zIQes';
 const APP_NAME = 'Lounge';
-const BUILD = '2026-10-13-1';
+const BUILD = '2026-10-13-2';
 /* ========================================================= */
 
 const EMAIL_DOMAIN = 'chat.local';
@@ -2024,9 +2024,15 @@ async function runCommand(text){
 
 /* /execute: remembered per account so offline people see it next time */
 const execKey = () => 'execSeen:' + (S.me ? S.me.id : '');
-function markExecSeen(id){ if (id && id > LS.get(execKey(), 0)) LS.set(execKey(), id); }
+let execSeenId = 0;
+const execSeen = () => Math.max(execSeenId, LS.get(execKey(), 0));
+function markExecSeen(id){
+  if (!id || id <= execSeen()) return;
+  execSeenId = id; LS.set(execKey(), id);
+  sb.rpc('mark_exec_seen', { p_id: id }).then(() => {}, () => {});   // saved to the account, not just this device
+}
 function onExecution(n, away){
-  if (!n || !S.me || n.id <= LS.get(execKey(), 0)) return;
+  if (!n || !S.me || n.id <= execSeen()) return;
   markExecSeen(n.id);
   const u = S.profiles.get(n.user_id) || (n.user_id === S.me.id ? S.me : null);
   if (!u) return;
@@ -2034,7 +2040,9 @@ function onExecution(n, away){
   playExecute(u, away ? (n.user_id === S.me.id ? 'This happened while you were away. You’re banned.' : `while you were away · ${agoShort(n.at)}`) : (n.user_id === S.me.id ? 'You’re banned.' : ''));
 }
 async function loadExecutions(){
-  const seen = LS.get(execKey(), 0);
+  const { data: row } = await sb.from('exec_seen').select('last_id').eq('user_id', S.me.id).maybeSingle();
+  if (row && row.last_id > execSeenId) execSeenId = row.last_id;
+  const seen = execSeen();
   let q = sb.from('executions').select('*').gt('id', seen).order('id').limit(10);
   if (!seen) q = q.gt('at', new Date(Date.now() - 2 * 86400000).toISOString());
   const { data, error } = await q;
