@@ -372,6 +372,7 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
 @keyframes exeB{0%{transform:none}15%{transform:translate(10px,10px) rotate(3deg)}100%{transform:translate(90px,110vh) rotate(30deg);opacity:.8}}
 @keyframes exeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes exeStamp{to{opacity:1;transform:translate(-50%,-50%) rotate(-12deg) scale(1)}}
+.upd-bar{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:85;display:flex;align-items:center;gap:12px;padding:8px 8px 8px 16px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);font-size:14px;animation:pop .2s ease;max-width:calc(100vw - 24px)}
 .key{font-family:'Geist Mono',monospace;font-size:22px;letter-spacing:.08em;background:var(--sunk);padding:14px;border-radius:12px;text-align:center;user-select:all;-webkit-user-select:all}
 .pw{position:relative}
 .pw .inp{padding-right:44px}
@@ -493,6 +494,7 @@ code{font-family:'Geist Mono',monospace;font-size:.88em;background:var(--sunk);p
 const SUPABASE_URL = 'https://nomtlkkplbtnqaxezzoy.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_ZN86bbuHIbzivhSalQMc0w_Ed0zIQes';
 const APP_NAME = 'Lounge';
+const BUILD = '2026-10-13-1';
 /* ========================================================= */
 
 const EMAIL_DOMAIN = 'chat.local';
@@ -827,6 +829,27 @@ async function cleanOldImages(){
   } catch {}
 }
 
+/* tell people when a newer version is out */
+let updateShown = false;
+async function checkForUpdate(){
+  if (updateShown || location.protocol === 'file:') return;
+  try {
+    const r = await fetch(location.pathname + '?v=' + Date.now(), { cache: 'no-store' });
+    const m = (await r.text()).match(/const BUILD = '([^']+)'/);
+    if (m && m[1] !== BUILD) {
+      updateShown = true;
+      const bar = document.createElement('div');
+      bar.className = 'upd-bar';
+      bar.innerHTML = `<span>A new version of ${esc(APP_NAME)} is out.</span><button class="btn sm primary" type="button">Refresh</button>`;
+      bar.querySelector('button').onclick = () => location.replace(location.pathname + '?v=' + m[1]);
+      document.body.appendChild(bar);
+    }
+  } catch {}
+}
+setInterval(checkForUpdate, 5 * 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
+setTimeout(checkForUpdate, 15000);
+
 /* how-it-works guide */
 const GUIDE = {
   basics: [
@@ -1043,7 +1066,7 @@ async function start(){
   renderMe(); applyRestrictions();
   subscribe();
   const last = LS.get('lastChannel', null), fromUrl = new URLSearchParams(location.search).get('c');
-  if (fromUrl) history.replaceState(null, '', location.pathname);
+  if (location.search) history.replaceState(null, '', location.pathname);
   await openChannel(fromUrl && S.channels.has(fromUrl) ? fromUrl : last && S.channels.has(last) ? last : defaultChannel());
   syncPush(); refreshPushBar();
   // brand-new members get the welcome tour once; everyone else gets the update log
