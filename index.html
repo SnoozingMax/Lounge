@@ -509,7 +509,7 @@ code{font-family:'Geist Mono',monospace;font-size:.88em;background:var(--sunk);p
 const SUPABASE_URL = 'https://nomtlkkplbtnqaxezzoy.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_ZN86bbuHIbzivhSalQMc0w_Ed0zIQes';
 const APP_NAME = 'Lounge';
-const BUILD = '2026-10-22-1';
+const BUILD = '2026-10-22-2';
 /* ========================================================= */
 
 const EMAIL_DOMAIN = 'chat.local';
@@ -2135,7 +2135,7 @@ function playExecute(u, away, kind){
     const col = ['#7ed321', '#a6f04a', '#ffe64d', '#ffd21f', '#5fcc2a', '#fff8a8'][i % 6];
     return `<i class="totem" style="--x:${Math.cos(ang) * dist}px;--y:${Math.sin(ang) * dist - 40}px;--s:${sz}px;--r:${(Math.random() * 720 - 360).toFixed(0)}deg;--c:${col};animation-delay:${(0.85 + Math.random() * 0.35).toFixed(2)}s;animation-duration:${(1.1 + Math.random() * 0.8).toFixed(2)}s"></i>`;
   }).join('') : '';
-  ov.innerHTML = `<div class="exe-stage"><div class="exe-half a">${pic}</div><div class="exe-half b">${pic}</div><div class="exe-slash"></div>${revive ? '<div class="exe-ring"></div>' + sparks : ''}</div>
+  ov.innerHTML = `<div class="exe-stage"><div class="exe-half a">${pic}</div><div class="exe-half b">${pic}</div><div class="exe-slash"></div>${revive ? sparks : ''}</div>
     <div class="exe-text"><b>${esc(dn(u))}</b> ${revive ? 'has been revived' : 'has been executed'}${away ? `<span class="exe-away">${esc(away)}</span>` : ''}</div>`;
   document.body.appendChild(ov);
   if (revive) setTimeout(reviveSound, 850); else setTimeout(slashSound, 650);
