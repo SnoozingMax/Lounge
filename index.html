@@ -365,6 +365,21 @@ textarea.inp{height:auto;padding:10px 12px;resize:none;line-height:1.45}
 .exe-text{text-align:center}
 .exe-away{display:block;margin-top:6px;font-size:13px;color:#8b8982}
 .exe-stamp{position:absolute;top:50%;left:50%;font-weight:800;font-size:min(64px,14vw);letter-spacing:.06em;color:#e5484d;border:6px solid #e5484d;border-radius:12px;padding:2px 18px;opacity:0;transform:translate(-50%,-50%) rotate(-12deg) scale(2.4);animation:exeStamp .3s 1.65s cubic-bezier(.3,1.6,.5,1) forwards;text-shadow:0 0 20px rgba(229,72,77,.5)}
+.exe.revive{background:radial-gradient(circle at 50% 45%,rgba(160,230,60,.14),rgba(0,0,0,.9) 60%)}
+.exe.revive::before{background:#c8ff5a;animation:exeFlash .6s .85s ease-out}
+.exe.revive .exe-half.a{animation:reviveA .85s cubic-bezier(.2,.8,.3,1) both}
+.exe.revive .exe-half.b{animation:reviveB .85s cubic-bezier(.2,.8,.3,1) both}
+.exe.revive .exe-stage{animation:reviveBob 1.2s .9s ease-out}
+.exe.revive .exe-slash{background:#e8ff8a;box-shadow:0 0 16px #c8ff5a,0 0 40px #7ed321;clip-path:inset(0);opacity:0;animation:reviveSeam .9s .8s ease-out forwards}
+.exe-ring{position:absolute;inset:-6%;border-radius:32%;border:3px solid #c8ff5a;box-shadow:0 0 30px #7ed321;opacity:0;animation:reviveRing 1.1s .9s ease-out forwards;pointer-events:none}
+.totem{position:absolute;left:50%;top:50%;width:var(--s);height:var(--s);margin:calc(var(--s) / -2) 0 0 calc(var(--s) / -2);background:var(--c);box-shadow:0 0 8px var(--c);opacity:0;animation:totemFly 1.4s cubic-bezier(.1,.7,.3,1) forwards;pointer-events:none}
+.exe.revive .exe-text{animation-delay:1.1s}
+@keyframes reviveA{0%{transform:translate(-90px,110vh) rotate(-35deg)}75%{transform:translate(-6px,-6px) rotate(-2deg)}100%{transform:none}}
+@keyframes reviveB{0%{transform:translate(90px,110vh) rotate(30deg)}75%{transform:translate(6px,6px) rotate(2deg)}100%{transform:none}}
+@keyframes reviveSeam{0%{opacity:1}100%{opacity:0}}
+@keyframes reviveRing{0%{opacity:1;transform:scale(.9)}100%{opacity:0;transform:scale(1.6)}}
+@keyframes totemFly{0%{opacity:0;transform:translate(0,0) rotate(0) scale(.4)}8%{opacity:1;transform:translate(calc(var(--x) * .15),calc(var(--y) * .15)) rotate(0) scale(1.2)}70%{opacity:1}100%{opacity:0;transform:translate(var(--x),calc(var(--y) + 70px)) rotate(var(--r)) scale(.6)}}
+@keyframes reviveBob{0%{transform:scale(1)}30%{transform:scale(1.08)}100%{transform:scale(1)}}
 @keyframes exeIn{from{transform:scale(.6);opacity:0}}
 @keyframes exeSlash{0%{clip-path:inset(0 0 0 100%);opacity:1}60%{clip-path:inset(0 0 0 0);opacity:1}100%{clip-path:inset(0 0 0 0);opacity:0}}
 @keyframes exeFlash{0%{opacity:.35}100%{opacity:0}}
@@ -494,7 +509,7 @@ code{font-family:'Geist Mono',monospace;font-size:.88em;background:var(--sunk);p
 const SUPABASE_URL = 'https://nomtlkkplbtnqaxezzoy.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_ZN86bbuHIbzivhSalQMc0w_Ed0zIQes';
 const APP_NAME = 'Lounge';
-const BUILD = '2026-10-13-2';
+const BUILD = '2026-10-22-1';
 /* ========================================================= */
 
 const EMAIL_DOMAIN = 'chat.local';
@@ -757,6 +772,9 @@ function showLogin(){
 
 /* update log: newest first. Add a new entry at the top for every update. */
 const UPDATES = [
+  { id: '2026-10-22a', date: 'Oct 22', items: [
+    ['✨', 'Getting unbanned now comes with a revive animation.']
+  ]},
   { id: '2026-10-13a', date: 'Oct 13', items: [
     ['⌨️', 'Type <code>/</code> to see the commands you can use.']
   ]},
@@ -2015,6 +2033,7 @@ async function runCommand(text){
     r = await sb.rpc('admin_mute', { p_user: u.id, p_minutes: 0 });
     if (!r.error) toast(`Unmuted ${u.username}`);
   } else {
+    if (c === 'unban') { await reviveUser(u); return true; }
     r = await sb.rpc('admin_set', { p_user: u.id, p_field: 'banned', p_value: c === 'ban' });
     if (!r.error) toast(`${c === 'ban' ? 'Banned' : 'Unbanned'} ${u.username}`);
   }
@@ -2036,8 +2055,13 @@ function onExecution(n, away){
   markExecSeen(n.id);
   const u = S.profiles.get(n.user_id) || (n.user_id === S.me.id ? S.me : null);
   if (!u) return;
-  if (u.id !== S.me.id) S.profiles.set(u.id, { ...u, banned: true });
-  playExecute(u, away ? (n.user_id === S.me.id ? 'This happened while you were away. You’re banned.' : `while you were away · ${agoShort(n.at)}`) : (n.user_id === S.me.id ? 'You’re banned.' : ''));
+  const rev = n.kind === 'revive', me = n.user_id === S.me.id;
+  if (!me) S.profiles.set(u.id, { ...u, banned: !rev });
+  const note = rev
+    ? (me ? 'You\u2019re unbanned. Welcome back.' : (away ? `while you were away \u00b7 ${agoShort(n.at)}` : ''))
+    : (me ? (away ? 'This happened while you were away. You\u2019re banned.' : 'You\u2019re banned.') : (away ? `while you were away \u00b7 ${agoShort(n.at)}` : ''));
+  playExecute(u, note, rev ? 'revive' : 'execute');
+  if (me && rev) setTimeout(() => location.reload(), 3800);
 }
 async function loadExecutions(){
   const { data: row } = await sb.from('exec_seen').select('last_id').eq('user_id', S.me.id).maybeSingle();
@@ -2048,6 +2072,20 @@ async function loadExecutions(){
   const { data, error } = await q;
   if (error || !data) return;
   for (const n of data) onExecution(n, true);
+}
+
+async function reviveUser(u){
+  if (!u.banned) { toast(`${u.username} isn’t banned`); return; }
+  let r = await sb.rpc('admin_revive', { p_user: u.id });
+  if (r.error && /admin_revive/.test(r.error.message)) {   // revive SQL not run yet: plain unban
+    r = await sb.rpc('admin_set', { p_user: u.id, p_field: 'banned', p_value: false });
+    if (r.error) return toast(friendly(r.error));
+    S.profiles.set(u.id, { ...u, banned: false }); toast(`${u.username} unbanned`); renderMembers(); return;
+  }
+  if (r.error) return toast(friendly(r.error));
+  S.profiles.set(u.id, { ...u, banned: false });
+  markExecSeen(r.data);
+  playExecute(u, '', 'revive');
 }
 
 /* /execute animation */
@@ -2068,19 +2106,39 @@ function slashSound(){
 }
 const execQueue = [];
 let execPlaying = false;
-function playExecute(u, away){
-  if (execPlaying) { execQueue.push([u, away]); return; }
+function reviveSound(){
+  if (soundMode() === 'off') return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const t = actx.currentTime;
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+      const o = actx.createOscillator(), g = actx.createGain(), st = t + i * 0.09;
+      o.type = 'triangle'; o.frequency.setValueAtTime(f, st);
+      g.gain.setValueAtTime(0.0001, st); g.gain.exponentialRampToValueAtTime(0.12, st + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, st + 0.9);
+      o.connect(g).connect(actx.destination); o.start(st); o.stop(st + 0.95);
+    });
+  } catch {}
+}
+function playExecute(u, away, kind){
+  if (execPlaying) { execQueue.push([u, away, kind]); return; }
+  const revive = kind === 'revive';
   execPlaying = true;
   document.querySelectorAll('.exe').forEach(e => e.remove());
   const pic = u.avatar_url && u.avatar_url.startsWith(AV_PREFIX)
     ? `<img src="${esc(u.avatar_url)}" alt="">`
     : `<div class="exe-letter" style="--c:${safeColor(u.color)}">${esc((dn(u) || '?')[0].toUpperCase())}</div>`;
   const ov = document.createElement('div');
-  ov.className = 'exe';
-  ov.innerHTML = `<div class="exe-stage"><div class="exe-half a">${pic}</div><div class="exe-half b">${pic}</div><div class="exe-slash"></div></div>
-    <div class="exe-text"><b>${esc(dn(u))}</b> has been executed${away ? `<span class="exe-away">${esc(away)}</span>` : ''}</div>`;
+  ov.className = 'exe' + (revive ? ' revive' : '');
+  // totem-style burst: squares shooting out from the middle in all directions
+  const sparks = revive ? Array.from({ length: 70 }, (_, i) => {
+    const ang = Math.random() * Math.PI * 2, dist = 90 + Math.random() * 260, sz = 5 + Math.random() * 9;
+    const col = ['#7ed321', '#a6f04a', '#ffe64d', '#ffd21f', '#5fcc2a', '#fff8a8'][i % 6];
+    return `<i class="totem" style="--x:${Math.cos(ang) * dist}px;--y:${Math.sin(ang) * dist - 40}px;--s:${sz}px;--r:${(Math.random() * 720 - 360).toFixed(0)}deg;--c:${col};animation-delay:${(0.85 + Math.random() * 0.35).toFixed(2)}s;animation-duration:${(1.1 + Math.random() * 0.8).toFixed(2)}s"></i>`;
+  }).join('') : '';
+  ov.innerHTML = `<div class="exe-stage"><div class="exe-half a">${pic}</div><div class="exe-half b">${pic}</div><div class="exe-slash"></div>${revive ? '<div class="exe-ring"></div>' + sparks : ''}</div>
+    <div class="exe-text"><b>${esc(dn(u))}</b> ${revive ? 'has been revived' : 'has been executed'}${away ? `<span class="exe-away">${esc(away)}</span>` : ''}</div>`;
   document.body.appendChild(ov);
-  setTimeout(slashSound, 650);
+  if (revive) setTimeout(reviveSound, 850); else setTimeout(slashSound, 650);
   let closed = false;
   const done = () => {
     if (closed) return; closed = true;
@@ -2102,7 +2160,7 @@ const COMMANDS = [
   { c: 'mute', a: '@user minutes', d: 'Stop someone from sending for a while', admin: true },
   { c: 'unmute', a: '@user', d: 'Let them send again', admin: true },
   { c: 'ban', a: '@user', d: 'Ban someone (no animation)', admin: true },
-  { c: 'unban', a: '@user', d: 'Undo a ban', admin: true },
+  { c: 'unban', a: '@user', d: 'Bring someone back with the revive animation', admin: true },
   { c: 'admin', a: '', d: 'Open the admin panel', admin: true },
   { c: 'help', a: '', d: 'Show the command list' }
 ];
@@ -2383,6 +2441,7 @@ async function adminAction(u, a){
   if (a === 'mute') return muteBox(u);
   if (a === 'unmute') { const { error } = await sb.rpc('admin_mute', { p_user: u.id, p_minutes: 0 }); if (error) return toast(friendly(error)); S.profiles.set(u.id, { ...u, muted_until: null }); toast(`Unmuted ${u.username}`); }
   else if (a === 'ban' || a === 'admin') {
+    if (a === 'ban' && u.banned) { await reviveUser(u); renderMembers(); return; }
     const field = a === 'ban' ? 'banned' : 'is_admin', val = !u[field];
     if (a === 'admin' && val && !await confirmBox(`Make ${dn(u)} an admin?`, 'They’ll be able to ban, mute, and delete anything.', 'Make admin')) return;
     const { error } = await sb.rpc('admin_set', { p_user: u.id, p_field: field, p_value: val });
